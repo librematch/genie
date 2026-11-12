@@ -10225,14 +10225,18 @@ fn an_attack_move_not_busy_ends_and_patrol_stays() {
 }
 
 /// Slot 0xb0 (`FUN_140c64ed0`) with `order` on unit 50 of [`lone_unit`] at (30, 30), on its
-/// way to (40, 30), its unit AI `unit_ai`, the unit's place (3, 4) of class 6, the AI stream
-/// seeded with 0: the answer, the unit AI after it, the AI stream's draws and whether the unit
-/// stopped.
-fn stop_lone(unit_ai: UnitAi, order: StopOrder) -> (GenieResult<()>, UnitAi, u32, bool) {
+/// way to (40, 30), its unit AI `unit_ai`, the unit's place (3, 4) of class `class`, the AI
+/// stream seeded with 0: the answer, the unit AI after it, the AI stream's draws and whether
+/// the unit stopped.
+fn stop_lone(
+    unit_ai: UnitAi,
+    order: StopOrder,
+    class: ClassId,
+) -> (GenieResult<()>, UnitAi, u32, bool) {
     let soldier = lone_unit(player_id(1), unit_ai, Position::new(30.0, 30.0, 0.0));
     let mut world = lone_world(on_its_way(soldier, Position::new(40.0, 30.0, 0.0)), &[]);
     world.streams.get_mut(Stream::Ai).set_seed(0);
-    let place = (Point::new(3.0, 4.0), Some(class::CLASS_6));
+    let place = (Point::new(3.0, 4.0), Some(class));
     let answer = run_ai(
         &mut world,
         (player_id(1), object_id(50)),
@@ -10255,7 +10259,7 @@ fn stop_ends_patrol_order_with_its_secondary_timer_capped() {
         secondary_timer: Millis::new(900),
         ..idle(UnitAiKind::Soldier)
     };
-    let (answer, unit_ai, draws, stopped) = stop_lone(patrolling, StopOrder::Keep);
+    let (answer, unit_ai, draws, stopped) = stop_lone(patrolling, StopOrder::Keep, class::CLASS_6);
     assert_eq!((answer, draws, stopped), (Ok(()), 0, true));
     assert_eq!(
         (
@@ -10292,7 +10296,8 @@ fn stop_on_patrol_order_redraws_adjusted_idle_timeout_of_750() {
             secondary_timer: Millis::new(700),
             ..idle(UnitAiKind::Soldier)
         };
-        let (answer, unit_ai, draws, stopped) = stop_lone(patrolling, StopOrder::Keep);
+        let (answer, unit_ai, draws, stopped) =
+            stop_lone(patrolling, StopOrder::Keep, class::CLASS_6);
         let redrawn = adjusted_idle_timeout(Millis::new(3000), &mut rng());
         assert_eq!((answer, draws, stopped), (Ok(()), 1, true));
         assert_eq!(
@@ -10311,7 +10316,7 @@ fn stop_on_patrol_order_redraws_adjusted_idle_timeout_of_750() {
         adjusted_idle_timeout: Millis::new(750),
         ..idle(UnitAiKind::Hunted)
     };
-    let (answer, unit_ai, draws, _) = stop_lone(hunted, StopOrder::Keep);
+    let (answer, unit_ai, draws, _) = stop_lone(hunted, StopOrder::Keep, class::CLASS_6);
     assert_eq!(
         (answer, draws, unit_ai.adjusted_idle_timeout),
         (Ok(()), 0, Millis::new(3750))
@@ -10335,7 +10340,8 @@ fn exploring_on_move_order() -> UnitAi {
 /// 750 and a secondary timer above it stay, the AI stream undrawn.
 #[test]
 fn stop_ending_other_order_leaves_its_timers() {
-    let (answer, unit_ai, draws, _) = stop_lone(exploring_on_move_order(), StopOrder::End);
+    let (answer, unit_ai, draws, _) =
+        stop_lone(exploring_on_move_order(), StopOrder::End, class::CLASS_6);
     assert_eq!((answer, draws), (Ok(()), 0));
     assert_eq!(
         (
@@ -10354,12 +10360,31 @@ fn stop_ending_other_order_leaves_its_timers() {
     assert_eq!(unit_ai.state_position, Point::new(3.0, 4.0));
 }
 
+/// Slot 0xb0 (`FUN_140c64ed0`) with 0 on a unit whose place is of class 18 (the raw `-0xe9a`,
+/// `CMP AX, 0x12` at `0x140c650ee`, then `JZ`): the order ends, but the state position keeps
+/// its point and does not take the unit's place.
+#[test]
+fn stop_ending_order_of_monk_keeps_state_position() {
+    let exploring = UnitAi {
+        state_position: Point::new(7.0, 8.0),
+        ..exploring_on_move_order()
+    };
+    let (answer, unit_ai, _, stopped) = stop_lone(exploring, StopOrder::End, class::MONK);
+    assert_eq!((answer, stopped), (Ok(()), true));
+    assert_eq!(
+        (unit_ai.current_order, unit_ai.last_order),
+        (None, Some(OrderKind::Move))
+    );
+    assert_eq!(unit_ai.state_position, Point::new(7.0, 8.0));
+}
+
 /// Slot 0xb0 (`FUN_140c64ed0`) with 1 on an order that is no patrol and an action not of it
 /// (action + 100 is not the order): the action stops, but the order stays and the state
 /// position does not take the unit's place.
 #[test]
 fn stop_keeping_orders_keeps_order_of_another_action() {
-    let (answer, unit_ai, draws, stopped) = stop_lone(exploring_on_move_order(), StopOrder::Keep);
+    let (answer, unit_ai, draws, stopped) =
+        stop_lone(exploring_on_move_order(), StopOrder::Keep, class::CLASS_6);
     assert_eq!((answer, draws, stopped), (Ok(()), 0, true));
     assert_eq!(
         (unit_ai.current_order, unit_ai.current_action),
