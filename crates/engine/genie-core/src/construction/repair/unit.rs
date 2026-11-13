@@ -25,6 +25,7 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::RoleId;
 use crate::objects::layers::Action;
+use crate::objects::layers::Building;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ChargeKind;
 use crate::objects::masters::Master;
@@ -53,7 +54,7 @@ use crate::world::layer::Roles;
 use crate::world::layer::generated::MovementTuning;
 use crate::world::objects_ref::ObjectsRef;
 use crate::world::others::OthersRef;
-use crate::world::parts::Parts;
+use crate::world::parts::PartTable;
 use crate::world::slots::CheckedIndexExt;
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
@@ -103,7 +104,7 @@ impl Unit {
                 let kind = target_unit
                     .master(step.world.master_tables(), player_id)?
                     .kind;
-                counted_object_of(&step.world.parts, others, target, kind)
+                counted_object_of(&step.world.parts.building, others, target, kind)
             }
             None => None,
         };
@@ -275,23 +276,24 @@ fn repairee_of(
             // slot 0xe8: the master's speed (`+0x740`), before a sprite's factor
             && Speed::ZERO < tm.animated_part().max_speed,
     };
-    let counted_in = counted_object_of(&step.world.parts, others, target, tm.kind)
+    let counted_in = counted_object_of(&step.world.parts.building, others, target, tm.kind)
         .map(|counted| (counted, step.world.parts.repairers_of(counted)));
     Ok((Some(repairee), counted_in))
 }
 
 /// The object `FUN_140ad9050` counts a Repair's repairers in, for its `target` (an object the
-/// world holds, of a master of type `kind`): a building annex's main building (`+0xbb8`), else
-/// the target; none once the world does not hold that object.
+/// world holds, of a master of type `kind`): a building annex's main building (`+0xbb8`, its
+/// building layer in `buildings`), else the target; none once the world does not hold that
+/// object.
 fn counted_object_of(
-    parts: &Parts,
+    buildings: &PartTable<Building>,
     others: OthersRef<'_>,
     target: ObjectId,
     kind: MasterKind,
 ) -> Option<ObjectId> {
     let counting = if kind == MasterKind::BUILDING {
-        parts
-            .building_of(target)
+        buildings
+            .of(target)
             .annex_of
             .map_or(target, MainBuildingId::id)
     } else {
