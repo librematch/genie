@@ -5,7 +5,9 @@ use crate::combat::MissileCount;
 use crate::commands::GatherPointState;
 use crate::commands::UnloadPick;
 use crate::commands::{GatherPoint, UnloadCommand};
+use crate::construction::FoundationId;
 use crate::construction::MainBuildingId;
+use crate::construction::wait_solidify::WaitSolidify;
 use crate::garrison::EnterKind;
 use crate::garrison::GarrisonScope;
 use crate::garrison::GarrisonSwitch;
@@ -53,6 +55,7 @@ use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::Voice;
+use crate::objects::actions::ActionList;
 use crate::objects::facing::SpriteFacets;
 use crate::objects::layers::Animated;
 use crate::objects::layers::CommandCount;
@@ -2440,36 +2443,7 @@ fn grouped_unit_that_enters_building_leaves_its_group() {
 /// ([`World::start_enter`]). The result and the world after it.
 fn enters_the_centre(setup: impl FnOnce(&mut World)) -> (GenieResult<()>, World) {
     let mut world = let_out_world();
-    let mut unit = unit(400, VILLAGER, HitPoints::new(25.0));
-    unit.place_for_test(Position::new(12.5, 10.0, 0.0));
-    let mut walker = tests_walker();
-    walker.stats = standing();
-    world.parts.put_mover(unit.id, Some(walker));
-    let villager_ai = UnitAi {
-        ai_kind: UnitAiKind::Civilian,
-        current_order: None,
-        current_action: None,
-        current_target: None,
-        ..UnitAi::default()
-    };
-    let _ = world
-        .push_live(PlayerId::new(1), Object::with_ai(unit, villager_ai))
-        .unwrap();
-    world.players[1].attributes = vec![Amount::ZERO; 250];
-    let placed = Placed {
-        position: Position::new(12.5, 10.0, 0.0),
-        radius: Footprint::new(0.2, 0.2),
-        class: class::VILLAGER,
-        player: PlayerId::new(1),
-        master: VILLAGER,
-        obstruction_kind: ObstructionKind::NONE,
-        buildable_on: BuildableOn::NO,
-        tall: true,
-        moves: false,
-        unknown: None,
-        obstruction: None,
-    };
-    world.spatial.insert(object_id(400), placed);
+    villager_400(&mut world, Position::new(12.5, 10.0, 0.0), standing());
     setup(&mut world);
     let idx = world.players[1].objects.last_place().unwrap();
     let garrison = Task {
@@ -2487,13 +2461,48 @@ fn enters_the_centre(setup: impl FnOnce(&mut World)) -> (GenieResult<()>, World)
     (start_enter, world)
 }
 
+/// Villager 400 of player 1 at `at`, moving by `stats`, with a villager's unit AI, on the map
+/// beside the town centre; player 1 holds no resources.
+fn villager_400(world: &mut World, at: Position, stats: MoveStats) {
+    let mut unit = unit(400, VILLAGER, HitPoints::new(25.0));
+    unit.place_for_test(at);
+    let mut walker = tests_walker();
+    walker.stats = stats;
+    world.parts.put_mover(unit.id, Some(walker));
+    let villager_ai = UnitAi {
+        ai_kind: UnitAiKind::Civilian,
+        current_order: None,
+        current_action: None,
+        current_target: None,
+        ..UnitAi::default()
+    };
+    let _ = world
+        .push_live(PlayerId::new(1), Object::with_ai(unit, villager_ai))
+        .unwrap();
+    world.players[1].attributes = vec![Amount::ZERO; 250];
+    let placed = Placed {
+        position: at,
+        radius: Footprint::new(0.2, 0.2),
+        class: class::VILLAGER,
+        player: PlayerId::new(1),
+        master: VILLAGER,
+        obstruction_kind: ObstructionKind::NONE,
+        buildable_on: BuildableOn::NO,
+        tall: true,
+        moves: false,
+        unknown: None,
+        obstruction: None,
+    };
+    world.spatial.insert(object_id(400), placed);
+}
+
 /// The enter into a building (`FUN_140a867b0`): a villager carrying food into a town centre
 /// that takes it as a drop site gives the load first (food and the food gathered, attribute
 /// 166) and carries nothing after; without the drop-site entry it keeps the load. A centre at
 /// a fifth of its hit points or less (480 of 2400) and a master that transforms into the
-/// centre (task 0x88) are not modelled, nor is the Enter's state 11 for a full centre: full
-/// by the start's room test (slot 0x198 with the unit, `FUN_1412169b0`), which counts what the
-/// villager holds too.
+/// centre (task 0x88) are not modelled. A full centre, full by the start's room test (slot 0x198
+/// with the unit, `FUN_1412169b0`), which counts what the villager holds too, is not entered:
+/// the Enter walks to its place (state 11, [`EnterAction::walk_to_point`]).
 #[test]
 fn an_enter_gives_its_load_to_drop_site_and_needs_room() {
     let with_food = |world: &mut World| {
@@ -2559,10 +2568,7 @@ fn an_enter_gives_its_load_to_drop_site_and_needs_room() {
         "an enter of a master that transforms (task 0x88)"
     );
     let full: fn(&mut World) = |world| give_room(world, TC, 0);
-    assert_eq!(
-        reason(full),
-        "an Enter into a building without room (state 11)"
-    );
+    walks_to_the_centre(enters_the_centre(full));
     // the start's slot 0x198 with the unit counts what the unit holds: a centre of room 2 with
     // an ally's villager inside takes villager 400 (1 + 1), and not with a unit inside it
     let crowded: fn(&mut World) = |world| {
@@ -2575,9 +2581,274 @@ fn an_enter_gives_its_load_to_drop_site_and_needs_room() {
         inside_tc(world, PlayerId::new(2), 2000, VILLAGER);
         held_by(world, PlayerId::new(2), 2001, 400);
     };
+    walks_to_the_centre(enters_the_centre(holding));
+}
+
+/// The start of `enter` (its result and its world) into a town centre without room for
+/// villager 400 (`0x140a86f20`): the message (`FUN_140a864d0`, nothing simulated), then
+/// `set_state(11)`: `FUN_140a85f30`, whose room test answers as the start's, meets the centre at
+/// its place, and a quiet `MoveTo` without a target walks there within 0 (`FUN_140aa0d30` at the
+/// Enter's height, its `+0x61` 2), started as the list adds it: the point is far, and the
+/// villager has no speed (state 13). The villager stays outside, and its unit AI hears nothing
+/// of the Enter.
+fn walks_to_the_centre((result, world): (GenieResult<()>, World)) {
+    assert_eq!(result, Ok(()));
+    let enter = world
+        .parts
+        .actions_of(object_id(400))
+        .list
+        .enter()
+        .copied()
+        .unwrap();
+    assert_eq!(enter.state.bare(), EnterState::WalkPoint { move_to: None });
     assert_eq!(
-        reason(holding),
-        "an Enter into a building without room (state 11)"
+        enter.state.move_to().copied(),
+        Some(MoveToAction {
+            state: MoveTo::Failed,
+            point: Position::new(10.0, 10.0, 0.0),
+            target: None,
+            range: Distance::ZERO,
+            sprite: None,
+            voice: Voice::Quiet,
+            on_target_moved: TargetMoved::Ignores,
+            wait: MoveWait::NEW,
+        })
+    );
+    assert_eq!(world.object(object_id(400)).unwrap().1.life.inside, None);
+}
+
+/// [`let_out_world`] with villager 400 at `at`, walking at 0.8 (its animation speed 1), whose list
+/// holds a wait for a foundation over `enter`: the wait's deletion (`FUN_140a98e20`) restarts the
+/// Enter (slot 0x28 with 0).
+fn restarting(at: Position, enter: EnterAction) -> World {
+    let mut world = let_out_world();
+    let walking = MoveStats {
+        speed: Speed::new(0.8),
+        base: Speed::new(0.8),
+        ..standing()
+    };
+    villager_400(&mut world, at, walking);
+    world.parts.set_anim_speed(object_id(400), Speed::new(1.0));
+    world.parts.actions.of_mut(object_id(400)).unwrap().list = ActionList::default()
+        .with_enter(Some(enter))
+        .with_wait_solidify(Some(WaitSolidify::new(
+            Task::default(),
+            FoundationId::new(object_id(300)),
+        )));
+    world
+}
+
+/// Villager 400's Enter of the garrison task (range 1) into town centre 100, met at its place,
+/// walking with a `MoveTo` in `walk` (none: no `MoveTo`).
+fn enter_100(walk: Option<MoveTo>) -> EnterAction {
+    let enter_action = EnterAction::new(
+        ContainerId::new(object_id(100)),
+        Position::new(10.0, 10.0, 0.0),
+        &enter_task(Distance::new(1.0), class::BUILDING),
+    );
+    walk.map_or(enter_action, |state| enter_action.walking(state))
+}
+
+/// `FUN_140a98e20` on villager 400 from its step ([`Unit::delete_own_head`]): its head goes and
+/// the action under it restarts.
+fn delete_head_of_400(world: &mut World) -> GenieResult<()> {
+    let idx = world.players[1]
+        .objects
+        .position_of(object_id(400))
+        .unwrap();
+    world.run_on_step(PlayerId::new(1), idx, |unit, actions, step| {
+        let by = unit.releaser(step)?;
+        let top = step.world.top_speed(step.player, unit)?;
+        unit.delete_own_head(actions, step, top, by)
+    })
+}
+
+/// Villager 400's Enter, its unit AI's notifies and its animation speed.
+fn restarted(world: &World) -> (EnterAction, Vec<(NotifyKind, [i32; 3])>, Speed) {
+    let enter = world
+        .parts
+        .actions_of(object_id(400))
+        .list
+        .enter()
+        .copied()
+        .unwrap();
+    let heard = world
+        .parts
+        .unit_ai
+        .get(object_id(400))
+        .unwrap()
+        .notifies
+        .iter()
+        .map(|notify| (notify.kind, notify.params))
+        .collect();
+    let mover = world.parts.mover_of(object_id(400)).unwrap();
+    (enter, heard, mover.animated.speed)
+}
+
+/// A deleted head over an Enter restarts it (`0x140a86f20`, which reads no argument): with room
+/// in its town centre and in reach of it, `set_state(4)` enters at once (`FUN_140a867b0`: notify
+/// 0x1fa, then `set_state(1)` with its 0x1f9, and `set_state(4)`'s own `set_state(1)` again).
+#[test]
+fn deleted_head_over_enter_in_reach_enters_at_once() {
+    let mut world = restarting(Position::new(12.5, 10.0, 0.0), enter_100(None));
+    delete_head_of_400(&mut world).unwrap();
+    let (enter, heard, _) = restarted(&world);
+    assert_eq!(enter.state, EnterState::Done);
+    let enter_value = [AiAction::Enter.value(), 0, 0];
+    assert_eq!(
+        heard,
+        [
+            (NotifyKind::ACTION_COMPLETED, enter_value),
+            (NotifyKind::ACTION_FAILED, enter_value),
+            (NotifyKind::ACTION_FAILED, enter_value),
+        ]
+    );
+    assert_eq!(
+        world.object(object_id(400)).unwrap().1.life.inside,
+        Some(container_id(100))
+    );
+}
+
+/// Out of reach, the restart's `set_state(4)` walks again: its sub-actions go (a `MoveTo` it
+/// walked stops the unit, slot 0x5d0) and a quiet `MoveTo` to the centre within the task's range
+/// starts (`FUN_140aa0df0`: state 3, the centre its target; its `+0x61` 2).
+#[test]
+fn deleted_head_over_enter_out_of_reach_walks_again() {
+    for (walk, animation) in [(None, Speed::new(1.0)), (Some(MoveTo::Moving), Speed::ZERO)] {
+        let mut world = restarting(Position::new(16.5, 10.0, 0.0), enter_100(walk));
+        delete_head_of_400(&mut world).unwrap();
+        let (enter, heard, speed) = restarted(&world);
+        let move_to = enter.state.move_to().copied().unwrap();
+        assert_eq!(enter.state.bare(), EnterState::Walk { move_to: None });
+        assert_eq!(
+            (
+                move_to.state,
+                move_to.target,
+                move_to.range,
+                move_to.voice,
+                move_to.on_target_moved
+            ),
+            (
+                MoveTo::Start,
+                Some(object_id(100)),
+                Distance::new(1.0),
+                Voice::Quiet,
+                TargetMoved::Ignores
+            )
+        );
+        assert_eq!((heard, speed), (Vec::new(), animation), "{walk:?}");
+    }
+}
+
+/// A centre without room for the villager makes the restart walk to its place (`FUN_140a864d0`'s
+/// message, nothing simulated, then `set_state(11)`), even in reach: the room test (slot 0x198)
+/// comes first. A `MoveTo` the Enter walked stops the unit; the new one, quiet and without a
+/// target, walks within 0 to the centre's place at the Enter's height (`FUN_140aa0d30`, `+0x61`
+/// 2) and starts (state 3).
+#[test]
+fn deleted_head_over_enter_without_room_walks_to_its_place() {
+    for (walk, animation) in [(None, Speed::new(1.0)), (Some(MoveTo::Moving), Speed::ZERO)] {
+        let mut world = restarting(Position::new(12.5, 10.0, 0.0), enter_100(walk));
+        give_room(&mut world, TC, 0);
+        delete_head_of_400(&mut world).unwrap();
+        let (enter, heard, speed) = restarted(&world);
+        assert_eq!(enter.state.bare(), EnterState::WalkPoint { move_to: None });
+        assert_eq!(
+            enter.state.move_to().copied(),
+            Some(MoveToAction {
+                state: MoveTo::Start,
+                point: Position::new(10.0, 10.0, 0.0),
+                target: None,
+                range: Distance::ZERO,
+                sprite: None,
+                voice: Voice::Quiet,
+                on_target_moved: TargetMoved::Ignores,
+                wait: MoveWait::NEW,
+            })
+        );
+        assert_eq!((heard, speed), (Vec::new(), animation), "{walk:?}");
+        assert_eq!(world.object(object_id(400)).unwrap().1.life.inside, None);
+    }
+}
+
+/// A villager inside an object (`+0x2f0`) fails the restarted Enter (`set_state(13)`): a `MoveTo`
+/// it walked goes and stops the unit (its wait for a move cleared), the unit shows its master's
+/// standing sprite (none here; its animation speed 0) and its unit AI hears 0x1f9 with the enter
+/// action value.
+#[test]
+fn deleted_head_over_enter_of_unit_inside_fails_it() {
+    for (walk, waiting) in [(None, 1), (Some(MoveTo::Moving), 0)] {
+        let mut world = restarting(Position::new(12.5, 10.0, 0.0), enter_100(walk));
+        world.object_mut(object_id(400)).unwrap().1.life.inside = Some(container_id(100));
+        delete_head_of_400(&mut world).unwrap();
+        let (enter, heard, speed) = restarted(&world);
+        assert_eq!(enter.state, EnterState::Failed);
+        assert_eq!(
+            heard,
+            [(NotifyKind::ACTION_FAILED, [AiAction::Enter.value(), 0, 0])]
+        );
+        assert_eq!(
+            (speed, world.parts.mover_of(object_id(400)).unwrap().waiting),
+            (Speed::ZERO, waiting),
+            "{walk:?}"
+        );
+    }
+}
+
+/// An Enter without a target (`+0x20` null) restarts by `set_state(4)` without the room test
+/// or the enter: `FUN_140a85f30` leaves its point, and a quiet `MoveTo` walks there within 0
+/// (`FUN_140aa0d30`, `+0x61` 2); a point below 0 on an axis walks to none (`FUN_140aa0df0`
+/// without a target: (0, 0, 0)), and a NaN one to the point (`COMISS`/`JA`). An Enter whose
+/// target the world does not hold is an error.
+#[test]
+fn deleted_head_over_enter_without_target_walks_to_its_point() {
+    let at = Position::new(14.5, f32::NAN, 0.0);
+    for (point, goal) in [
+        (at, at),
+        (Position::new(-1.0, 12.5, 0.0), Position::ORIGIN),
+        (Position::new(14.5, -0.5, 0.0), Position::ORIGIN),
+    ] {
+        let enter_action = EnterAction {
+            target: None,
+            point,
+            ..enter_100(Some(MoveTo::Moving))
+        };
+        let mut world = restarting(Position::new(12.5, 10.0, 0.0), enter_action);
+        delete_head_of_400(&mut world).unwrap();
+        let (enter, heard, speed) = restarted(&world);
+        let move_to = enter.state.move_to().copied().unwrap();
+        assert_eq!(enter.state.bare(), EnterState::Walk { move_to: None });
+        assert_eq!(
+            (
+                move_to.state,
+                move_to.target,
+                move_to.range,
+                move_to.voice,
+                move_to.on_target_moved
+            ),
+            (
+                MoveTo::Start,
+                None,
+                Distance::ZERO,
+                Voice::Quiet,
+                TargetMoved::Ignores
+            )
+        );
+        assert_eq!(
+            (move_to.point.x().to_bits(), move_to.point.y().to_bits()),
+            (goal.x().to_bits(), goal.y().to_bits())
+        );
+        assert_eq!((heard, speed), (Vec::new(), Speed::ZERO));
+        assert_eq!(enter.point.x().to_bits(), point.x().to_bits());
+    }
+    let gone = EnterAction {
+        target: Some(container_id(999)),
+        ..enter_100(None)
+    };
+    let mut world = restarting(Position::new(12.5, 10.0, 0.0), gone);
+    assert_eq!(
+        delete_head_of_400(&mut world).unwrap_err().reason(),
+        "an object the caller holds that the world does not hold"
     );
 }
 

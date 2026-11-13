@@ -29,6 +29,7 @@ mod outcomes;
 mod raider_countdown;
 mod relics;
 pub(crate) use self::relics::Kept;
+mod restart;
 mod scope;
 mod shelter;
 mod takes_in;
@@ -36,6 +37,7 @@ pub mod transport;
 pub(crate) mod unit;
 mod unload;
 mod walk_in;
+mod walk_point;
 
 pub use self::class_flags::ClassFlags;
 pub use self::container_id::{Container, ContainerId};

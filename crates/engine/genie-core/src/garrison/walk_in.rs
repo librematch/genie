@@ -42,7 +42,8 @@ use genie_diff::Diff;
 pub const ENTER: ActionKind = ActionKind::named(3);
 
 /// An Enter whose target died or is not allied: the update lets it go and turns to state 11
-/// (`FUN_140a87320` case 11: a quiet `MoveTo` to the meeting point), which is not modelled.
+/// (`FUN_140a87320` case 11: a quiet `MoveTo` to the meeting point, which
+/// [`EnterAction::walk_to_point`] ports for a target without room), which is not modelled.
 const ENTER_TARGET_DIED: GenieError =
     GenieError::unsupported("an Enter whose building died or is not allied (state 11)");
 /// `set_state(2)`'s wait before the Enter walks again, in seconds (`FUN_140a87320`, the constant
@@ -231,10 +232,7 @@ impl EnterAction {
             gap: start.gap,
             state: Some(enter_target.state),
         };
-        let move_to = if enter_target.kind == EnterKind::Building
-            || self.point.x() < 0.0
-            || self.point.y() < 0.0
-        {
+        let move_to = if enter_target.kind == EnterKind::Building || self.point_below_zero() {
             reads.to_object(
                 to,
                 self.walk_range(enter_target.kind),
@@ -257,6 +255,12 @@ impl EnterAction {
             self.point.y(),
             enter_target.position.z(),
         ))))
+    }
+
+    /// `set_state(4)`'s test of its point after `FUN_140a85f30`: below 0 on an axis (`COMISS 0,
+    /// x` with `JA`, `0x140a8758b`: a NaN is not).
+    pub(super) fn point_below_zero(&self) -> bool {
+        self.point.x() < 0.0 || self.point.y() < 0.0
     }
 
     /// The Enter with a `MoveTo` in `state` to its target within the task's range, as
@@ -355,7 +359,6 @@ impl EnterAction {
         actions: &mut Action,
         me: Me,
         reads: &EnterReads,
-        roles: &Roles,
     ) -> GenieResult<HeadCode> {
         let enter_target = Self::held_target(reads.target)?;
         match self.state {
@@ -367,7 +370,14 @@ impl EnterAction {
             EnterState::Wait => {
                 self.timer -= step.dt.seconds();
                 if self.timer <= Seconds::ZERO {
-                    let _ = self.again(step, unit, actions, &enter_target, reads, roles)?;
+                    let _ = self.again(
+                        step,
+                        unit,
+                        actions,
+                        &enter_target,
+                        reads.start,
+                        reads.defaults,
+                    )?;
                 }
             }
             EnterState::Walk { .. } => {
@@ -407,7 +417,14 @@ impl EnterAction {
         let roles = &step.world.model.roles.clone();
         let walked_again = self.target_moved(enter_target);
         let entered = walked_again
-            && self.again(step, unit, actions, enter_target, reads, roles)? == EnterAgain::Entered;
+            && self.again(
+                step,
+                unit,
+                actions,
+                enter_target,
+                reads.start,
+                reads.defaults,
+            )? == EnterAgain::Entered;
         match self.move_to_update(step, unit, me, reads)? {
             // the walk again's enter put the unit inside, at the target's place: still in reach,
             // it enters again
@@ -420,8 +437,15 @@ impl EnterAction {
             // a failed MoveTo is none a walk again made in this update
             SubCode::Failed if self.retry => {
                 self.retry = false;
-                self.again(step, unit, actions, enter_target, reads, roles)
-                    .map(|_| ())
+                self.again(
+                    step,
+                    unit,
+                    actions,
+                    enter_target,
+                    reads.start,
+                    reads.defaults,
+                )
+                .map(|_| ())
             }
             SubCode::Done | SubCode::Failed => self.wait(step, unit),
             SubCode::TargetGone => Err(ENTER_TARGET_DIED),
@@ -492,9 +516,10 @@ impl EnterAction {
             && (moved(x - self.point.x()) || moved(y - self.point.y()) || moved(z - self.point.z()))
     }
 
-    /// The update's `set_state(4)` ([`EnterAction::walk_again`]): its `MoveTo`'s teardown stops
-    /// the unit (slot 0x5d0), then a unit in reach enters at once (`FUN_140a867b0`, then
-    /// `set_state(1)`: [`EnterAction::enter_at_once`]). A transport's code 1 sends it to the
+    /// The update's and the restart's `set_state(4)` ([`EnterAction::walk_again`], with the
+    /// reads' `start` and the sprites its `MoveTo`s take for none, `defaults`): its `MoveTo`'s
+    /// teardown stops the unit (slot 0x5d0), then a unit in reach enters at once (`FUN_140a867b0`,
+    /// then `set_state(1)`: [`EnterAction::enter_at_once`]). A transport's code 1 sends it to the
     /// point at once: it tests that it reaches within 1 of the point's tile (slot 0x3d8,
     /// `FUN_14114ffc0` with the point truncated), then moves there (slot 0x340,
     /// [`crate::world::World::move_transport`], the unit lent to the world). A transport that
@@ -510,8 +535,8 @@ impl EnterAction {
         unit: &mut Unit,
         actions: &mut Action,
         enter_target: &EnterTarget,
-        reads: &EnterReads,
-        roles: &Roles,
+        start: WalkStart,
+        defaults: MoveDefaults,
     ) -> GenieResult<EnterAgain> {
         if self.state.move_to().is_some()
             && let Some(mover) = step.world.parts.mover_mut(unit.id)
@@ -521,8 +546,8 @@ impl EnterAction {
         let top = step.world.top_speed(step.player, unit)?;
         let walking = {
             let world = &mut *step.world;
-            // the update's reads found it (`held_target`), and the Enter's own update removes
-            // no other object
+            // the caller's reads found it (the update's `held_target`, the restart's view), and
+            // nothing since removed an object
             let (tp, target) = OthersRef::of(&world.players, &world.index, step.player)?
                 .find(self.target)
                 .ok_or(GenieError::unreachable(
@@ -546,13 +571,13 @@ impl EnterAction {
                 target_speed,
             };
             let sprites = SpriteReads {
-                defaults: reads.defaults,
+                defaults,
                 graphics: &world.model.graphics,
             };
             let moves = MoveToReads::with_sprites(sprites, meeting.unit, meeting.mover, top);
             self.walk_again(
                 enter_target,
-                reads.start,
+                start,
                 meeting,
                 &moves,
                 ObjectsRef::new(
@@ -568,7 +593,8 @@ impl EnterAction {
         };
         match walking {
             Walking::Enter => {
-                self.enter_at_once((actions, step, unit), enter_target.id, roles)?;
+                let roles = step.world.model.roles.clone();
+                self.enter_at_once((actions, step, unit), enter_target.id, &roles)?;
                 return Ok(EnterAgain::Entered);
             }
             Walking::Walk(Some(at)) => {

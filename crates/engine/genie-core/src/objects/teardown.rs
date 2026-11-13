@@ -299,15 +299,17 @@ impl Unit {
     /// again ([`MakeAction::first`] with its owner's attributes). The Explore's (`0x140a87e10`)
     /// starts it again too ([`Unit::restart_explore`]: to its point, or waiting for one); the
     /// Transport's (`FUN_140aa3e10`) idles ([`Unit::restart_transport`]) and the missile's
-    /// (`0x140a9c5b0`) flies ([`MissileAction::restart`]). Nothing for an empty list.
+    /// (`0x140a9c5b0`) flies ([`MissileAction::restart`]). A `MoveTo` of its own (`0x140aa2100`)
+    /// walks and updates at once ([`Unit::restart_move_to`]); an Enter (`0x140a86f20`) starts again
+    /// on its target ([`Unit::restart_enter`]). Nothing for an empty list.
     ///
     /// [`MakeAction::first`]: crate::gathering::make::MakeAction::first
     /// [`MissileAction::restart`]: crate::combat::missile::MissileAction::restart
     ///
     /// # Errors
     ///
-    /// An owner the world lacks, the Explore's and the Transport's, and the restart of any other
-    /// kind, which is not ported.
+    /// An owner the world lacks, the Explore's, the Transport's, the `MoveTo`'s and the Enter's,
+    /// and the restart of any other kind, which is not ported.
     pub(crate) fn restart_head(
         &mut self,
         actions: &mut LayersAction,
@@ -332,6 +334,8 @@ impl Unit {
                 missile_action.restart();
                 Ok(())
             }
+            Some(Action::MoveTo(_)) => self.restart_move_to(actions, step),
+            Some(Action::Enter(_)) => self.restart_enter(actions, step),
             Some(head) => Err(GenieError::unreachable(NEXT_HEAD).with("kind", head.kind())),
         }
     }

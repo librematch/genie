@@ -18,7 +18,7 @@ use crate::movement::footprint_gap_squared;
 use crate::movement::move_to::MoveStep;
 use crate::movement::move_to::Patience;
 use crate::movement::move_to::StepEnd;
-use crate::movement::move_to::{MoveTo, Shows};
+use crate::movement::move_to::{MoveTo, Shown, Shows};
 use crate::movement::step::VelocityStep;
 use crate::movement::stop_mover;
 use crate::movement::{GroupSpeed, Me};
@@ -243,6 +243,51 @@ impl Unit {
             self.own_move_end(context, step.end)?;
         }
         Ok(HeadCode::ended(ended))
+    }
+
+    /// The own `MoveTo`'s slot 0x28 with 0 (`0x140aa2100`), as the action list's deletion
+    /// restarts it at the head (`FUN_140a98e20`): `set_state(4)` (`0x140aa29e0`) shows its sprite
+    /// (slot 0x68 with `+0x58`; a null one shows the master's standing sprite, `+0x470`), with
+    /// which the unit reads its top speed, and jumps to its update at once (slot 0x30,
+    /// `0x140aa2a70`: [`Unit::move_to_part`]). The deletion reads no code of it: an update that
+    /// ends the `MoveTo` leaves it at the head for the next update.
+    ///
+    /// # Errors
+    ///
+    /// A unit whose master the world lacks (read for a null sprite and the top speed), and the
+    /// update's.
+    pub(crate) fn restart_move_to(
+        &mut self,
+        actions: &mut Action,
+        step: &mut Step<'_>,
+    ) -> GenieResult<()> {
+        let Some(move_to) = actions.list.move_to_mut() else {
+            return Ok(());
+        };
+        move_to.state = MoveTo::Moving;
+        let graphic = match move_to.sprite {
+            Some(graphic) => Some(graphic),
+            None => self
+                .master(step.world.master_tables(), step.player)?
+                .standing_sprite
+                .and_then(|sprite_id| step.world.model.graphics.get(sprite_id))
+                .copied(),
+        };
+        Shown {
+            sprite: &mut self.sprite,
+            rng: step.world.streams.get_mut(Stream::Sprite),
+            graphic,
+        }
+        .show(
+            step.world.parts.motion.layer_mut(self.id).move_stats_mut(),
+            step.world.model.tuning.sprite,
+        );
+        let top_speed = step.world.top_speed_terms(step.player, self)?;
+        let me = self.me(actions, top_speed);
+        let roles = step.world.model.roles.clone();
+        // the deletion drops the update's code
+        let _ = self.move_to_part(actions, step, me, &roles)?;
+        Ok(())
     }
 
     /// [`Unit::move_to_part`]'s give-up ([`Unit::own_move_gave_up`]): a human player's villager

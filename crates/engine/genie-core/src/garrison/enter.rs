@@ -242,8 +242,8 @@ impl World {
 
     /// The Enter's install (slot 0x808): the action list empties and the Enter starts (slot 5,
     /// `FUN_140a86f20`): a unit inside an object fails it (`set_state(13)`, its notify for the
-    /// unit's own AI the answer, [`World::install_enter_as`]); a target without room
-    /// (`FUN_140a864d0`, `set_state(11)`) is not modelled; else its `set_state(4)`
+    /// unit's own AI the answer, [`World::install_enter_as`]); a target without room walks to its
+    /// place ([`World::enter_without_room`]); else its `set_state(4)`
     /// ([`EnterAction::walk_again`]): a unit in reach enters at once ([`World::enter_now`]),
     /// else it walks, a transport to the point first ([`World::move_transport`]).
     pub(super) fn install_enter(
@@ -285,9 +285,10 @@ impl World {
         }
         let (tp, unit) = self.object(target).ok_or_else(|| object_gone(target))?;
         if !self.has_room(tp, unit, Some(id))? {
-            return Err(GenieError::unsupported(
-                "an Enter into a building without room (state 11)",
-            ));
+            let meet = unit.position().ground();
+            return self
+                .enter_without_room(player, idx, action, meet, slot)
+                .map(|()| None);
         }
         let (enter_target, start) = self.entering(player, idx, target, task.work_range)?;
         let walking = self.enter_walk_again(player, idx, &mut action, &enter_target, start)?;
@@ -319,6 +320,38 @@ impl World {
                     .map(|()| None)
             }
         }
+    }
+
+    /// [`World::install_enter_as`] into a target without room for unit `idx` of `player`: the
+    /// player's message (`FUN_140a864d0`, through the screen's `FUN_140c85f00`: nothing
+    /// simulated), then `set_state(11)` ([`EnterAction::walk_to_point`]): `FUN_140a85f30`, whose
+    /// room test answers as the start's, meets the target at its place `meet`, and the Enter
+    /// `action` walks there. It goes into its `slot`.
+    ///
+    /// # Errors
+    ///
+    /// A unit the list does not hold, whose master the world lacks, and the walk's.
+    fn enter_without_room(
+        &mut self,
+        player: PlayerId,
+        idx: ListIndex,
+        mut action: EnterAction,
+        meet: Point,
+        slot: EnterSlot,
+    ) -> GenieResult<()> {
+        let unit = self.players.live(player, idx)?;
+        let reads = MoveToReads::of(
+            unit,
+            self.top_speed(player, unit)?,
+            unit.master(self.master_tables(), player)?,
+            &self.model.graphics,
+            self.parts.combat_of(unit.id).abilities.look.as_ref(),
+            &self.model.roles,
+        );
+        action.walk_to_point(meet, &reads, &self.model.tuning.move_to)?;
+        let id = unit.id;
+        self.parts.actions.of_mut(id)?.place_enter(action, slot);
+        Ok(())
     }
 
     /// [`World::install_enter_as`] under the Artifact on top of unit `idx` of `player` (its id

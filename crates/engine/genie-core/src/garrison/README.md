@@ -6,7 +6,9 @@ Units go into buildings and transports, and come out again. This folder holds bo
   takes it in, the nearest first.
 - `takes_in.rs` tests whether a building takes a unit in, and how much room it has.
 - `enter.rs`, `walk_in.rs` and `meeting.rs` hold the Enter action: the command, the walk to the
-  building or transport, and the point where they meet.
+  building or transport, and the point where they meet. `walk_point.rs` holds its walks to a
+  point: to a target without room (state 11), and without a target. `restart.rs` starts it
+  again when the action list's deletion leaves it at the head.
 - `unit.rs` is the unit's part: a unit entering and its update while it is inside another
   object. `holder.rs` is the container's part of an enter and a leave: its list, its volleys
   and, in a building, its counts of the villagers and raiders inside (`counts.rs`) and of the
@@ -53,6 +55,7 @@ Units go into buildings and transports, and come out again. This folder holds bo
 | [`raider_countdown.rs`](raider_countdown.rs) | A combat object's raider countdown. |
 | [`relics.rs`](relics.rs) | A building's relics and livestock inside it (`FUN_1411cb850`, `FUN_1411d6ad0`): their counts, the relics its player holds and the researched technologies paid in relics. |
 | [`relics_tests.rs`](relics_tests.rs) | Tests: A building's relics and livestock (`FUN_1411cb850`, `FUN_1411d6ad0`): their counts as they go in and out, the relics its player holds, the technologies updated as a relic comes in and those paid in relics that go back as one leaves. |
+| [`restart.rs`](restart.rs) | The Enter's restart under a deleted head (its slot 0x28 with 0): its start again, by where the unit is and what its target has room for. |
 | [`scope.rs`](scope.rs) | Which shelters a garrison takes (`GarrisonScope`) and how far a unit goes to one (`ShelterReach`). |
 | [`shelter.rs`](shelter.rs) | The garrison order and `SEEK_SHELTER`: each unit to a building that takes it in, nearest first (`Shelters`). |
 | [`siege_tests.rs`](siege_tests.rs) | Tests: A siege unit's count of the infantry inside it, and a ranged unit's reload as it leaves one. |
@@ -61,6 +64,7 @@ Units go into buildings and transports, and come out again. This folder holds bo
 | [`unit.rs`](unit.rs) | A unit entering a building or a transport, and its update inside. |
 | [`unload.rs`](unload.rs) | UNLOAD and `GO_BACK_TO_WORK`: the units inside a building or a transport come out. |
 | [`walk_in.rs`](walk_in.rs) | The Enter action (`EnterAction`, `RGE_Action_Enter`): its walk to its target, its wait and its update. |
+| [`walk_point.rs`](walk_point.rs) | The Enter's walks to a point (`EnterAction`): its walk to its target's place (state 11) and its walk without a target. |
 | [`transport/`](transport/) | The Transport action (`RGE_Action_Transport`, type 12, vtable `0x142ed61e8`): a transport's sail to a point and its unload there. |
 <!-- /files -->
 

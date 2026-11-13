@@ -105,6 +105,7 @@ use crate::movement::move_to::MoveWaitState;
 use crate::movement::move_to::Patience;
 use crate::movement::move_to::{MOVE_TO, MoveWait, TargetMoved};
 use crate::movement::move_to::{MoveTo, MoveToAction};
+use crate::movement::tests::{builder_9177, path_world};
 use crate::movement::{
     Me, MoveStats, Mover, PathData, Velocity, WaypointIndex, footprint_gap_squared,
 };
@@ -13794,21 +13795,20 @@ fn clearing_three_actions_restarts_the_second_and_the_third() {
     }
 }
 
-/// Each restart comes after the teardown before it let go, and before the next deletion: an
-/// Enter whose restart is not ported stops the deletion at the head after the walk let town
-/// centre 9149 go (and, with a Make between them, after the Make restarted), its own target still
-/// taken; from the world and from the unit's step alike.
+/// Each restart comes after the teardown before it let go, and before the next deletion: a
+/// Hunt whose restart is not ported stops the deletion at the head after the walk let town
+/// centre 9149 go (and, with a Make between them, after the Make restarted), untouched; from the
+/// world and from the unit's step alike.
 #[test]
 fn each_restart_follows_the_teardown_before_it() {
-    let enter = ActionList::default().with_enter(Some(enter_town_centre()));
+    let hunt = ActionList::default().with_hunt(Some(hunting(9150)));
     for (list, holding) in [
         (
-            enter.clone().with_move_to(Some(walk_to_town_centre())),
+            hunt.clone().with_move_to(Some(walk_to_town_centre())),
             (Some(attribute::FOOD), Amount::new(15.0)),
         ),
         (
-            enter
-                .clone()
+            hunt.clone()
                 .with_make(Some(made_farm_food()))
                 .with_move_to(Some(walk_to_town_centre())),
             (Some(attribute::FARM_FOOD), Amount::ZERO),
@@ -13828,7 +13828,7 @@ fn each_restart_follows_the_teardown_before_it() {
             .unwrap_err();
         for (stopped, error) in [(world, error), (stepped, step_error)] {
             assert_eq!(error.reason(), NEXT_HEAD);
-            assert_eq!(stopped.parts.actions_of(object_id(40)).list, enter);
+            assert_eq!(stopped.parts.actions_of(object_id(40)).list, hunt);
             assert_eq!(
                 town_workers_and_holding(&stopped),
                 (0, 1, holding.0, holding.1)
@@ -14116,6 +14116,126 @@ fn deleted_head_over_missile_flies() {
         })
     );
     assert_eq!(villager_speeds(&world), (Speed::new(1.3), Speed::new(1.0)));
+}
+
+/// A running sprite (`id` 13154) whose speed factor is 1.5, looped.
+const RUNNING: Graphic = Graphic {
+    id: SpriteId::named(13154),
+    frames: Frame::of_data(10),
+    facets: FacetCount::of_data(16),
+    speed_multiplier: SpeedMultiplier::of_data(1.5),
+    frame_duration: Seconds::new(0.1),
+    replay_delay: Seconds::ZERO,
+    flags: SpriteFlags::ANIMATED,
+};
+
+/// A deleted head over a `MoveTo` of its own restarts it with 0 (`0x140aa2100`): `set_state(4)`
+/// (`0x140aa29e0`) shows its sprite, with which the unit reads its top speed (the running
+/// sprite's 1.5 times the base 0.8), and jumps to its update at once (slot 0x30,
+/// `0x140aa2a70`): the motion step turns builder 9177 toward its path's next point in the same
+/// step (its forward vector), whatever state the `MoveTo` was in.
+#[test]
+fn deleted_head_over_own_move_to_walks_at_once_with_its_sprite() {
+    for state in [MoveTo::Arrived, MoveTo::Start, MoveTo::Failed] {
+        let mut world = path_world(Player::default());
+        let own = MoveToAction {
+            state,
+            sprite: Some(RUNNING),
+            ..MoveToAction::to_point(
+                Position::new(30.0, 88.0, 0.0),
+                Distance::new(0.1),
+                None,
+                Speed::new(0.8),
+            )
+        };
+        world.parts.actions.of_mut(object_id(9177)).unwrap().list =
+            wait_over(ActionList::default().with_move_to(Some(own)));
+        in_update(
+            &mut world,
+            (PlayerId::new(1), ListIndex::new(0)),
+            100,
+            |unit, actions, step| {
+                let by = unit.releaser(step)?;
+                let top = step.world.top_speed(step.player, unit)?;
+                unit.delete_own_head(actions, step, top, by)
+            },
+        )
+        .unwrap();
+        let builder = &world.players[1].objects[ListIndex::new(0)];
+        assert_eq!(
+            builder.sprite.map(|active_sprite| active_sprite.graphic.id),
+            Some(RUNNING.id)
+        );
+        let mover = world.parts.mover_of(object_id(9177)).unwrap();
+        assert_ne!(mover.forward, builder_9177().forward, "{state:?}");
+        assert_eq!(mover.stats.speed, Speed::new(0.8 * 1.5));
+        assert_eq!(
+            world
+                .parts
+                .actions_of(object_id(9177))
+                .list
+                .move_to()
+                .map(|move_to_action| move_to_action.state),
+            Some(MoveTo::Moving)
+        );
+    }
+}
+
+/// The restarted `MoveTo`'s update runs whole: its first check of its target lets town centre
+/// 9149, removed (state 7), go at once (slot 0x180 from a loud `MoveTo`: one worker less) and
+/// tells the unit AI (0x1fb with the move action value and −1), and the update ends there
+/// (code 4), which the deletion drops: the `MoveTo` stays at the head in state 4 without a
+/// target. Its null sprite shows the master's standing sprite (slot 0x68 with none: factor 1.25
+/// on the base 0.8).
+#[test]
+fn deleted_head_over_own_move_to_lets_its_removed_target_go_at_once() {
+    let standing = Graphic {
+        id: SpriteId::named(13151),
+        speed_multiplier: SpeedMultiplier::of_data(1.25),
+        ..RUNNING
+    };
+    let mut world = walking_villager_holding(wait_over(
+        ActionList::default().with_move_to(Some(walk_to_town_centre())),
+    ));
+    // the unit AI takes an invalidation of its current action alone
+    world
+        .parts
+        .unit_ai
+        .get_mut(object_id(40))
+        .unwrap()
+        .current_action = Some(AiAction::Move);
+    let _ = Arc::make_mut(&mut world.model.graphics).insert(standing.id, standing);
+    for masters in &mut world.model.masters {
+        if let Some(master) = Arc::make_mut(masters).get_mut(VILLAGER_MALE) {
+            master.standing_sprite = Some(standing.id);
+        }
+    }
+    world.players[1].objects[ListIndex::new(3)].life.state = ObjectState::Removed;
+    delete_villager_head(&mut world).unwrap();
+    assert_eq!(
+        world
+            .parts
+            .actions_of(object_id(40))
+            .list
+            .move_to()
+            .map(|move_to_action| (move_to_action.state, move_to_action.target)),
+        Some((MoveTo::Moving, None))
+    );
+    assert_eq!(
+        villager_heard(&world),
+        [(
+            NotifyKind::ACTION_INVALIDATED,
+            [AiAction::Move.value(), -1, 0]
+        )]
+    );
+    assert_eq!(
+        town_workers_and_holding(&world),
+        (0, 1, Some(attribute::FOOD), Amount::new(15.0))
+    );
+    assert_eq!(
+        villager_speeds(&world),
+        (Speed::new(0.8 * 1.25), Speed::new(1.0))
+    );
 }
 
 /// `FUN_1411e63f0` then `FUN_1411e6580` at a built building's death: each storage entry of mode

@@ -6,7 +6,8 @@ use crate::garrison::EnterOutcome;
 use crate::garrison::EnterSlot;
 use crate::garrison::EnterState;
 use crate::garrison::{
-    ENTERING_UNPLACED, EnterAction, EnterReads, INSIDE_SIGHT, NO_MASTERS, WalkStart, enter_view,
+    ENTERING_UNPLACED, EnterAction, EnterReads, EnterTarget, INSIDE_SIGHT, NO_MASTERS, WalkStart,
+    enter_view,
 };
 use crate::groups::LeavingWalk;
 use crate::map::Distance;
@@ -83,73 +84,29 @@ impl Unit {
             return Ok(HeadCode::Keeps);
         };
         let reads = self.enter_reads(step, &enter, roles)?;
-        let updated = enter.update(step, self, actions, me, &reads, roles);
+        let updated = enter.update(step, self, actions, me, &reads);
         if let Some(enter_action) = actions.list.enter_mut() {
             *enter_action = enter;
         }
         updated
     }
 
-    /// What the Enter's update reads as it starts: its target, one of its own player's or an
-    /// ally's (another player's is not modelled), with room for the unit (slot 0x198 with the
-    /// unit, [`World::has_room`]: what the target and the unit hold, and the unit, within the
-    /// target's capacity) and the rest of
-    /// [`crate::garrison::enter_view`]; the `MoveTo`'s give-up (a human player's villager waits,
-    /// by its unit AI's stance) and the sprites its constructors take for none
-    /// (`FUN_140aa0d30`, `FUN_140aa0df0`).
+    /// What the Enter's update reads as it starts: its target ([`Unit::enter_view_of`]; none for
+    /// one the world does not hold), the `MoveTo`'s give-up (a human player's villager waits, by
+    /// its unit AI's stance) and the sprites its constructors take for none (`FUN_140aa0d30`,
+    /// `FUN_140aa0df0`).
     ///
     /// # Errors
     ///
-    /// The target's master's, the room test's and [`crate::garrison::enter_view`]'s.
-    ///
-    /// [`World::has_room`]: crate::world::World::has_room
+    /// A unit whose master the world lacks, and [`Unit::enter_view_of`]'s.
     fn enter_reads(
         &self,
         step: &mut Step<'_>,
         enter: &EnterAction,
         roles: &Roles,
     ) -> GenieResult<EnterReads> {
-        let by_id = ObjectsRef::new(
-            &step.world.players,
-            &step.world.index,
-            &step.world.model.masters,
-            &step.world.parts,
-            &step.world.model.roles,
-            &step.world.model.tuning,
-            step.world.treaty.as_ref(),
-        );
-        let others = OthersRef::of(&step.world.players, &step.world.index, step.player)?;
-        let (target, start) = match others.find(enter.target) {
-            Some((tp, unit)) => {
-                let master = unit.master(
-                    MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
-                    tp,
-                )?;
-                // slot 0x198 with the unit (`FUN_140a85f30`)
-                let room = step.world.has_room(tp, unit, Some(self.id))?;
-                let target_speed = step.world.top_speed(tp, unit)?;
-                let (mut view, start) = enter_view(
-                    &mut step.world.spatial,
-                    (self, step.world.parts.mover_of(self.id)),
-                    (
-                        (unit, step.world.parts.mover_of(unit.id), target_speed),
-                        master,
-                        room,
-                    ),
-                    enter.task.work_range,
-                    by_id,
-                )?;
-                // FUN_141663dc0 with allies, or Gaia's
-                view.allied = tp == PlayerId::GAIA
-                    || allied(
-                        &step.world.players.player(step.player)?.relations,
-                        step.world.treaty.as_ref(),
-                        step.player,
-                        tp,
-                        AllyTest::WithRelation4,
-                    );
-                (Some(view), start)
-            }
+        let (target, start) = match self.enter_view_of(step, enter)? {
+            Some((view, start)) => (Some(view), start),
             None => (
                 None,
                 WalkStart {
@@ -179,6 +136,65 @@ impl Unit {
                 roles,
             ),
         })
+    }
+
+    /// What the Enter `enter` reads of its target, any player's: room for the unit (slot 0x198
+    /// with the unit, [`World::has_room`]: what the target and the unit hold, and the unit,
+    /// within the target's capacity), its player an ally (`FUN_141663dc0` with allies) or Gaia,
+    /// and the rest of [`crate::garrison::enter_view`]. None for a target the world does not
+    /// hold.
+    ///
+    /// # Errors
+    ///
+    /// The target's master's, the room test's and [`crate::garrison::enter_view`]'s.
+    ///
+    /// [`World::has_room`]: crate::world::World::has_room
+    pub(super) fn enter_view_of(
+        &self,
+        step: &mut Step<'_>,
+        enter: &EnterAction,
+    ) -> GenieResult<Option<(EnterTarget, WalkStart)>> {
+        let by_id = ObjectsRef::new(
+            &step.world.players,
+            &step.world.index,
+            &step.world.model.masters,
+            &step.world.parts,
+            &step.world.model.roles,
+            &step.world.model.tuning,
+            step.world.treaty.as_ref(),
+        );
+        let others = OthersRef::of(&step.world.players, &step.world.index, step.player)?;
+        let Some((tp, unit)) = others.find(enter.target) else {
+            return Ok(None);
+        };
+        let master = unit.master(
+            MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
+            tp,
+        )?;
+        // slot 0x198 with the unit (`FUN_140a85f30`)
+        let room = step.world.has_room(tp, unit, Some(self.id))?;
+        let target_speed = step.world.top_speed(tp, unit)?;
+        let (mut view, start) = enter_view(
+            &mut step.world.spatial,
+            (self, step.world.parts.mover_of(self.id)),
+            (
+                (unit, step.world.parts.mover_of(unit.id), target_speed),
+                master,
+                room,
+            ),
+            enter.task.work_range,
+            by_id,
+        )?;
+        // FUN_141663dc0 with allies, or Gaia's
+        view.allied = tp == PlayerId::GAIA
+            || allied(
+                &step.world.players.player(step.player)?.relations,
+                step.world.treaty.as_ref(),
+                step.player,
+                tp,
+                AllyTest::WithRelation4,
+            );
+        Ok(Some((view, start)))
     }
 
     /// The Enter's enter in its update (`FUN_140a867b0` into `target`, [`Unit::enter_building`],
@@ -231,6 +247,30 @@ impl Unit {
     ///
     /// A unit without its Enter, and the stop's, the sprite's and the notify's.
     pub(crate) fn entered(&mut self, actions: &mut Action, step: &mut Step<'_>) -> GenieResult<()> {
+        self.enter_ends(actions, step, EnterState::Done)
+    }
+
+    /// The Enter's `set_state(13)` (`FUN_140a87320` case 13), its failure: as its `set_state(1)`
+    /// ([`Unit::entered`]) in state 13.
+    ///
+    /// # Errors
+    ///
+    /// [`Unit::entered`]'s.
+    pub(crate) fn enter_failed(
+        &mut self,
+        actions: &mut Action,
+        step: &mut Step<'_>,
+    ) -> GenieResult<()> {
+        self.enter_ends(actions, step, EnterState::Failed)
+    }
+
+    /// The Enter's `set_state` to `end`, 1 or 13 ([`Unit::entered`], [`Unit::enter_failed`]).
+    fn enter_ends(
+        &mut self,
+        actions: &mut Action,
+        step: &mut Step<'_>,
+        end: EnterState,
+    ) -> GenieResult<()> {
         let enter = actions
             .list
             .enter_mut()
@@ -240,7 +280,7 @@ impl Unit {
         {
             mover.stop()?;
         }
-        enter.state = EnterState::Done;
+        enter.state = end;
         self.shows_standing_sprite(
             step.world.parts.motion.layer_mut(self.id),
             OwnerMasters::new(
