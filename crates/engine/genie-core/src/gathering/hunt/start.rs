@@ -8,7 +8,7 @@ use crate::gathering::PastureId;
 use crate::gathering::gather::Walks;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::{HuntAction, HuntTask, Lead, Quarry};
-use crate::gathering::{HuntTargetId, both_food};
+use crate::gathering::{HuntTargetId, load_for_task};
 use crate::map::Distance;
 use crate::map::Position;
 use crate::movement::MoveStart;
@@ -34,6 +34,7 @@ use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::generated::HuntTuning;
 use crate::world::layer::generated::MoveToTuning;
+use crate::world::settings::Settings;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
@@ -75,8 +76,8 @@ pub struct HuntStart<'world> {
     pub(crate) player: PlayerId,
     /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
     pub(crate) player_kind: PlayerKind,
-    /// The game settings' test `FUN_141302150`.
-    pub(crate) carry_rule: bool,
+    /// The game settings, whose test `FUN_141302150` ([`Settings::carry_rule`]) the load reads.
+    pub(crate) settings: &'world Settings,
     /// What the hunter carries, its resource kind and amount.
     pub(crate) held: &'world mut Held,
     /// What its `MoveTo`s' constructors read of the hunter; its load is `held`'s.
@@ -166,11 +167,9 @@ impl HuntAction {
     }
 
     /// The install's start (slot 5 with 1, `0x140ac49b0`) of a Hunt that holds `target` (the
-    /// constructor's, [`HuntAction::new`]): a hunter carrying another food keeps the amount as the
-    /// task's kind (`FUN_14119d310` on `held`); one carrying another resource drops it when the
-    /// game settings' test `FUN_141302150` (`carry_rule`) says so or it is a computer player's
-    /// (`player_kind`, `FUN_141659cf0`) carrying nothing; a target holding nothing changes no
-    /// load. A loaded hunter sent to one of its own drop sites carries the load there
+    /// constructor's, [`HuntAction::new`]): a target that holds something (`+0x310` above 0)
+    /// gives the hunter the task's load ([`load_for_task`] on `held`); one holding nothing changes
+    /// no load. A loaded hunter sent to one of its own drop sites carries the load there
     /// (`set_state` 8); else `set_state(4)` ([`HuntAction::chase`]): a target of another, unallied
     /// player (or of class 49) that is not dead yet is attacked first (`set_state` 12). How its
     /// Attack's `MoveTo` started (a walk to a drop site is under way). A Hunt whose constructor
@@ -200,24 +199,12 @@ impl HuntAction {
             target,
             player,
             player_kind,
-            carry_rule,
+            settings,
             held,
             walks,
         } = start;
         if Amount::ZERO < target.amount {
-            let kind = self.task.resource;
-            let both_food = both_food(kind, held.kind);
-            let drops = player_kind.is_computer() && held.amount == Amount::ZERO;
-            if held.kind != kind {
-                if both_food {
-                    held.kind = kind;
-                } else if drops || carry_rule {
-                    *held = Held {
-                        kind,
-                        amount: Amount::ZERO,
-                    };
-                }
-            }
+            *held = load_for_task(*held, self.task.resource, settings, player_kind);
         }
         let walks = Walks {
             held: *held,

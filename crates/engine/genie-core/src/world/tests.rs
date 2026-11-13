@@ -13686,18 +13686,23 @@ fn enter_town_centre() -> EnterAction {
     }
 }
 
-/// `FUN_140a98e20` from the villager's step ([`Unit::delete_own_head`]) with its own top speed
-/// and as the releaser.
+/// `FUN_140a98e20` from the villager's step ([`delete_head_at`]).
 fn delete_villager_head(world: &mut World) -> GenieResult<()> {
-    world.run_on_step(
-        PlayerId::new(1),
-        ListIndex::new(2),
-        |unit, actions, step| {
-            let by = unit.releaser(step)?;
-            let top = step.world.top_speed(step.player, unit)?;
-            unit.delete_own_head(actions, step, top, by)
-        },
-    )
+    delete_head_at(world, PlayerId::new(1), ListIndex::new(2))
+}
+
+/// `FUN_140a98e20` from the step of `player`'s unit at `idx` ([`Unit::delete_own_head`]) with its
+/// own top speed and as the releaser: its head goes and the action under it restarts.
+pub(crate) fn delete_head_at(
+    world: &mut World,
+    player: PlayerId,
+    idx: ListIndex,
+) -> GenieResult<()> {
+    world.run_on_step(player, idx, |unit, actions, step| {
+        let by = unit.releaser(step)?;
+        let top = step.world.top_speed(step.player, unit)?;
+        unit.delete_own_head(actions, step, top, by)
+    })
 }
 
 /// The workers of town centres 9149 and 9150 and the villager's holding.
@@ -13795,20 +13800,21 @@ fn clearing_three_actions_restarts_the_second_and_the_third() {
     }
 }
 
-/// Each restart comes after the teardown before it let go, and before the next deletion: a
-/// Hunt whose restart is not ported stops the deletion at the head after the walk let town
+/// Each restart comes after the teardown before it let go, and before the next deletion: an
+/// Attack whose restart is not ported stops the deletion at the head after the walk let town
 /// centre 9149 go (and, with a Make between them, after the Make restarted), untouched; from the
 /// world and from the unit's step alike.
 #[test]
 fn each_restart_follows_the_teardown_before_it() {
-    let hunt = ActionList::default().with_hunt(Some(hunting(9150)));
+    let attack = ActionList::default().with_attack(Some(own_attack(9150, -1, AttackState::New)));
     for (list, holding) in [
         (
-            hunt.clone().with_move_to(Some(walk_to_town_centre())),
+            attack.clone().with_move_to(Some(walk_to_town_centre())),
             (Some(attribute::FOOD), Amount::new(15.0)),
         ),
         (
-            hunt.clone()
+            attack
+                .clone()
                 .with_make(Some(made_farm_food()))
                 .with_move_to(Some(walk_to_town_centre())),
             (Some(attribute::FARM_FOOD), Amount::ZERO),
@@ -13828,7 +13834,7 @@ fn each_restart_follows_the_teardown_before_it() {
             .unwrap_err();
         for (stopped, error) in [(world, error), (stepped, step_error)] {
             assert_eq!(error.reason(), NEXT_HEAD);
-            assert_eq!(stopped.parts.actions_of(object_id(40)).list, hunt);
+            assert_eq!(stopped.parts.actions_of(object_id(40)).list, attack);
             assert_eq!(
                 town_workers_and_holding(&stopped),
                 (0, 1, holding.0, holding.1)
@@ -13909,7 +13915,7 @@ fn walking_villager_holding(list: ActionList) -> World {
 
 /// `under` with a wait for foundation 10028 at its head: a head whose destructor stops nothing
 /// and lets nothing go, so the restart alone changes the villager.
-fn wait_over(under: ActionList) -> ActionList {
+pub(crate) fn wait_over(under: ActionList) -> ActionList {
     under.with_wait_solidify(Some(WaitSolidify::new(
         Task::default(),
         FoundationId::new(object_id(10028)),

@@ -12,6 +12,7 @@ use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::{
     HUNT_TARGET_UNPLACED, HUNTER_UNPLACED, HuntAction, HuntTask, Quarry, stand_sprite,
 };
+use crate::gathering::load_for_task;
 use crate::map::Distance;
 use crate::map::spatial::{SearchQuery, Spatial};
 use crate::math::rng::Stream;
@@ -21,6 +22,7 @@ use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::layers::Action;
+use crate::objects::lifecycle::Held;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::PlayersMastersExt;
@@ -29,6 +31,8 @@ use crate::objects::sprite::new_sprite;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::objects::{ObjectKey, WorkerCount};
+use crate::orders::object_gone;
+use crate::players::Amount;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
@@ -77,22 +81,47 @@ impl Unit {
         self.hunt_search_state(hunt, actions, step, roles)
     }
 
-    /// The install's start (slot 5 with 1, `0x140ac49b0`) of a `hunt` whose constructor held no
-    /// target (one past state 6, [`HuntAction::new`]): it changes no load, which reads the
-    /// target's amount, and searches (`set_state(3)`, [`Unit::hunt_search_state`]). The list
-    /// holds it from then on.
+    /// The Hunt's slot 0x28 (`0x140ac49b0`) where it searches: with 0, as the action list's
+    /// deletion restarts the `hunt` at the head ([`Unit::restart_head`]), and with 1, as the
+    /// install starts one whose constructor held no target (one past state 6,
+    /// [`HuntAction::new`]). A target that holds something (`+0x310` above 0; `COMISS` and `JBE`:
+    /// a NaN holds nothing) gives the hunter the task's load ([`load_for_task`]); a hunt without
+    /// one changes no load. Then `set_state(3)`: the sub-actions go (`FUN_140a98620`: an Attack's
+    /// or a `MoveTo`'s teardown stops the unit) and the hunt searches
+    /// ([`Unit::hunt_search_state`]). The list holds it from then on.
+    ///
+    /// [`Unit::restart_head`]: crate::objects::unit::Unit::restart_head
     ///
     /// # Errors
     ///
-    /// The search's.
+    /// A target the world does not hold, and the teardown's and the search's.
     pub(crate) fn hunt_begin_search(
         &mut self,
         mut hunt: HuntAction,
         actions: &mut Action,
         step: &mut Step<'_>,
     ) -> GenieResult<()> {
-        let roles = &step.world.model.roles.clone();
+        if let Some(target) = hunt.target {
+            let (_, quarry, _) = step
+                .world
+                .locate(target)
+                .ok_or_else(|| object_gone(target))?;
+            if Amount::ZERO < quarry.life.amount {
+                let player_kind = step.world.players.player(step.player)?.kind;
+                Held {
+                    kind: self.life.attribute_kind,
+                    amount: self.life.amount,
+                } = load_for_task(
+                    self.life.held(),
+                    hunt.task.resource,
+                    &step.world.settings,
+                    player_kind,
+                );
+            }
+        }
+        hunt.tear_down(step.world.parts.mover_mut(self.id))?;
         hunt.state = HuntState::Search;
+        let roles = &step.world.model.roles.clone();
         self.hunt_search_state(&mut hunt, actions, step, roles)
     }
 

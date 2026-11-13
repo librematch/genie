@@ -89,7 +89,6 @@ impl World {
         let engagement = self.engagement(player, idx, target)?;
         let arms = self.arms(player, idx, &hunt.task)?;
         let player_kind = self.players.player(player)?.kind;
-        let carry_rule = self.settings.carry_rule();
         let top_speed = self.top_speed_terms(player, self.players.live(player, idx)?)?;
         let unit = self.players.live_mut(player, idx)?;
         let walks = unit.move_walks(
@@ -110,7 +109,7 @@ impl World {
                 target: quarry,
                 player,
                 player_kind,
-                carry_rule,
+                settings: &self.settings,
                 held: &mut held,
                 walks,
             },

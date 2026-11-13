@@ -11,6 +11,7 @@ use crate::gathering::gather::{
     SEARCH_WAIT, Walks,
 };
 use crate::map::Distance;
+use crate::map::Footprint;
 use crate::map::Position;
 use crate::movement::move_to::SubCode;
 use crate::movement::move_to::{MoveToAction, TargetMoved};
@@ -42,11 +43,22 @@ pub fn waits_for_farm(master: MasterId, target_class: Option<ClassId>, roles: &R
         || (roles.of_master(master).contains(MasterRoles::TRAP_WAITER) && roles.of_some_class(target_class).contains(ClassRoles::FARM))
 }
 
+/// The radius that `set_state(11)` walks within besides the task's range (`0x140a8cd40` case
+/// 0xb, which case 0xf2 joins): the x of its target's master's radii `radius` (`+0x5d8`), none
+/// for a stop farm (`master` 50 or 1187). A Gather without a target walks within none.
+#[must_use]
+pub(crate) fn walk_back_radius(master: MasterId, radius: Footprint, roles: &Roles) -> Distance {
+    if roles.of_master(master).contains(MasterRoles::STOP_FARM) {
+        Distance::ZERO
+    } else {
+        Distance::new(radius.x())
+    }
+}
+
 impl GatherAction {
-    /// `set_state(11)` (`0x140a8cd40` case 0xb) with its target's radius on x (`+0x5d8`; none
-    /// for a stop farm, masters 50 and 1187): the sub-actions go, the timer clears and a quiet
-    /// `MoveTo` to the point within that radius plus the task's range starts
-    /// ([`GatherAction::move_to_point`]).
+    /// `set_state(11)` (`0x140a8cd40` case 0xb) with its target's radius on x (`radius`,
+    /// [`walk_back_radius`]): the sub-actions go, the timer clears and a quiet `MoveTo` to the
+    /// point within that radius plus the task's range starts ([`GatherAction::move_to_point`]).
     ///
     /// # Errors
     ///
@@ -194,15 +206,8 @@ impl GatherAction {
         if self.timer < Seconds::ZERO {
             return Ok(Next::Stay);
         }
-        let radius = target.map_or(0.0, |victim| {
-            if roles
-                .of_master(victim.master_id)
-                .contains(MasterRoles::STOP_FARM)
-            {
-                0.0
-            } else {
-                victim.radius.x()
-            }
+        let radius = target.map_or(Distance::ZERO, |victim| {
+            walk_back_radius(victim.master_id, victim.radius, roles)
         });
         if !self.worked {
             if roles
@@ -220,12 +225,7 @@ impl GatherAction {
                     .parts
                     .mover_mut(unit.id)
                     .ok_or(GATHERER_UNMOVING)?;
-                self.set_walk_back(
-                    Distance::new(radius),
-                    mover,
-                    &walks,
-                    &step.world.model.tuning.move_to,
-                )?;
+                self.set_walk_back(radius, mover, &walks, &step.world.model.tuning.move_to)?;
                 self.target = None;
                 return Ok(Next::Stay);
             }
@@ -243,12 +243,7 @@ impl GatherAction {
             .parts
             .mover_mut(unit.id)
             .ok_or(GATHERER_UNMOVING)?;
-        self.begin_reseed_walk(
-            Distance::new(radius),
-            mover,
-            &walks,
-            &step.world.model.tuning.move_to,
-        )?;
+        self.begin_reseed_walk(radius, mover, &walks, &step.world.model.tuning.move_to)?;
         Ok(Next::Stay)
     }
 

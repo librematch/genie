@@ -8,6 +8,7 @@ use crate::gathering::DropSiteId;
 use crate::gathering::GatherTargetId;
 use crate::gathering::drop_sites::SitePlace;
 use crate::gathering::gather::Walks;
+use crate::gathering::gather::point_walks::walk_back_radius;
 use crate::gathering::gather::{
     FARM_FOOD_SOLD, GATHERER_UNMOVING, GatherAction, GatherReads, GatherState, Next,
     productivity_of,
@@ -15,6 +16,8 @@ use crate::gathering::gather::{
 use crate::gathering::hunt::DropOff;
 use crate::gathering::hunt::Dropped;
 use crate::gathering::hunt::HuntSprites;
+use crate::gathering::load_for_task;
+use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Position;
 use crate::math::rng::Stream;
@@ -26,7 +29,9 @@ use crate::objects::ActionState;
 use crate::objects::Graphics;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
+use crate::objects::WorkerCount;
 use crate::objects::layers::Action;
+use crate::objects::lifecycle::Held;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::PlayersMastersExt;
 use crate::objects::masters::{MasterTables, OwnerMasters};
@@ -34,6 +39,7 @@ use crate::objects::release::Releaser;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Presence;
 use crate::objects::unit::{Unit, second_target_checked};
+use crate::orders::object_gone;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
@@ -44,6 +50,7 @@ use crate::unit_ai::task_finder::Actor;
 use crate::unit_ai::task_finder::drops_at;
 use crate::unit_ai::task_finder::world::state_of;
 use crate::unit_ai::world_view::DropWorld;
+use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::lets::release;
 use crate::world::objects_ref::ObjectsRef;
@@ -141,10 +148,95 @@ impl Unit {
         Ok(())
     }
 
-    /// The start of the Gather `gather` without a target (`0x140a8b3a0`: its constructor held
-    /// none, one past state 6) on the gatherer's step, as the install adds it to `actions`:
-    /// `set_state(3)` ([`GatherAction::begin_search`] with what its update reads,
-    /// [`Unit::gather_reads`]), then the unit AI's notify ([`Unit::gather_search`]).
+    /// The Gather's slot 0x28 with 0 (`0x140a8b3a0`), as the action list's deletion restarts the
+    /// `gather` at the head ([`Unit::restart_head`]): the gatherer takes the task's load
+    /// ([`load_for_task`]). Then a Gather of the farm class 49 (its target type, `+0x68`) on a
+    /// target that two or more work (`+0x644`, read only for that class) walks to its point as
+    /// to a point only: `set_state(11)` within the farm's radius ([`walk_back_radius`]), then the
+    /// farm goes (slot 0x68 with none: its slot 0x180 at once). Any other searches
+    /// (`set_state(3)`, [`Unit::gather_begin_search`]).
+    ///
+    /// [`Unit::restart_head`]: crate::objects::unit::Unit::restart_head
+    ///
+    /// # Errors
+    ///
+    /// A farm the world does not hold, a gatherer whose master the slice lacks or that cannot
+    /// move, and the walk's, the let-go's and the search's.
+    pub(crate) fn restart_gather(
+        &mut self,
+        gather: GatherAction,
+        actions: &mut Action,
+        step: &mut Step<'_>,
+    ) -> GenieResult<()> {
+        let player_kind = step.world.players.player(step.player)?.kind;
+        Held {
+            kind: self.life.attribute_kind,
+            amount: self.life.amount,
+        } = load_for_task(
+            self.life.held(),
+            gather.task.resource,
+            &step.world.settings,
+            player_kind,
+        );
+        let roles = &step.world.model.roles;
+        if let Some(farm) = gather.target
+            && roles
+                .of_some_class(gather.target_class)
+                .contains(ClassRoles::FARM)
+        {
+            let (_, farm_unit, master) = readable(step, farm)?.ok_or_else(|| object_gone(farm))?;
+            if WorkerCount::ONE < farm_unit.workers {
+                let radius = walk_back_radius(master.id, master.radius, roles);
+                return self.leave_shared_farm(gather, radius, actions, step);
+            }
+        }
+        self.gather_begin_search(gather, actions, step)
+    }
+
+    /// The restart's walk off a farm that two or more work (`0x140a8b3a0`): `set_state(11)`
+    /// within `radius` ([`GatherAction::set_walk_back`], with the walks of the gatherer's load),
+    /// then the farm goes (slot 0x68 with none), let go at once (slot 0x180).
+    ///
+    /// # Errors
+    ///
+    /// A gatherer whose master the slice lacks or that cannot move, and the walk's and the
+    /// let-go's.
+    fn leave_shared_farm(
+        &mut self,
+        mut gather: GatherAction,
+        radius: Distance,
+        actions: &mut Action,
+        step: &mut Step<'_>,
+    ) -> GenieResult<()> {
+        let top_speed = step.world.top_speed_terms(step.player, self)?;
+        let walks = self.move_walks(
+            step.world.parts.mover_of(self.id),
+            top_speed,
+            WalkSprites {
+                every: step.world.master_tables(),
+                player: step.player,
+                graphics: &step.world.model.graphics,
+                look: step.world.parts.combat_of(self.id).abilities.look.as_ref(),
+            },
+            &step.world.model.roles,
+        )?;
+        let mover = step
+            .world
+            .parts
+            .mover_mut(self.id)
+            .ok_or(GATHERER_UNMOVING)?;
+        gather.set_walk_back(radius, mover, &walks, &step.world.model.tuning.move_to)?;
+        let farm = gather.target.take();
+        actions.list.set_gather(Some(gather));
+        let by = self.releaser(step)?;
+        release(step, self, farm, by)
+    }
+
+    /// The start of the Gather `gather` without a target (`0x140a8b3a0` with 1: its constructor
+    /// held none, one past state 6) on the gatherer's step, as the install adds it to `actions`,
+    /// and its restart's search ([`Unit::restart_gather`]): `set_state(3)`
+    /// ([`GatherAction::begin_search`] with what its update reads, [`Unit::gather_reads`]), then
+    /// the unit AI's notify ([`Unit::gather_search`]).
     ///
     /// # Errors
     ///

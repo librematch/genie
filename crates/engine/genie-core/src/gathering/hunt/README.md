@@ -52,5 +52,5 @@ hunts its own livestock can lead the animal toward the drop site first (state 10
 ## How it connects
 
 <!-- uses -->
-- Uses: [`combat`](../../combat/), [`map`](../../map/), [`math`](../../math/), [`movement`](../../movement/), [`objects`](../../objects/), [`players`](../../players/), [`unit_ai`](../../unit_ai/), [`world`](../../world/).
+- Uses: [`combat`](../../combat/), [`map`](../../map/), [`math`](../../math/), [`movement`](../../movement/), [`objects`](../../objects/), [`orders`](../../orders/), [`players`](../../players/), [`unit_ai`](../../unit_ai/), [`world`](../../world/).
 <!-- /uses -->

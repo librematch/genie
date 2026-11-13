@@ -6,11 +6,12 @@ use crate::gathering::FarmStops;
 use crate::gathering::StopIndex;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::Stand;
+use crate::gathering::gather::point_walks::walk_back_radius;
 use crate::gathering::gather::{
     FARM_STOPS, GatherAction, GatherReads, Resource, STOP_DRAWS, Walks,
 };
 use crate::gathering::hunt::HuntTask;
-use crate::gathering::{GatherTargetId, both_food};
+use crate::gathering::{GatherTargetId, load_for_task};
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Point;
@@ -37,6 +38,7 @@ use crate::world::layer::generated::GatherTuning;
 use crate::world::layer::generated::MoveToTuning;
 use crate::world::layer::generated::Tuning;
 use crate::world::settings::FarmMode;
+use crate::world::settings::Settings;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
@@ -50,8 +52,8 @@ pub struct GatherStart<'world> {
     pub(crate) player: PlayerId,
     /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
     pub(crate) player_kind: PlayerKind,
-    /// The game settings' test `FUN_141302150`.
-    pub(crate) carry_rule: bool,
+    /// The game settings, whose test `FUN_141302150` ([`Settings::carry_rule`]) the load reads.
+    pub(crate) settings: &'world Settings,
     /// What the gatherer carries, its resource kind and amount.
     pub(crate) held: &'world mut Held,
     /// What its `MoveTo`s' constructors read of the gatherer; its load is `held`'s.
@@ -241,16 +243,14 @@ impl GatherAction {
         }
     }
 
-    /// The install's start (slot 5 with 1, `0x140a8b3a0`): a gatherer carrying another food keeps
-    /// the amount as the task's kind (`FUN_14119d310`); one carrying another resource drops it
-    /// when the game settings' test `FUN_141302150` (`carry_rule`) says so or it is a computer
-    /// player's carrying nothing. A loaded gatherer sent to one of its own drop sites carries the
-    /// load there: the target becomes the second target (the caller takes it, then releases it as
-    /// the first), the point clears and `set_state(8)` walks there. Else `set_state(4)` walks to
-    /// the target. A farm another farmer works (with this one, two or more) is walked to only as
-    /// a point (`set_state(11)`, [`GatherAction::set_walk_back`]) and let go. A Gather whose
-    /// constructor held no target (one past state 6) searches (`set_state(3)`), which the caller
-    /// runs on the gatherer's step ([`GatherOpening::Searches`]).
+    /// The install's start (slot 5 with 1, `0x140a8b3a0`): the gatherer takes the task's load
+    /// ([`load_for_task`] on `held`). A loaded gatherer sent to one of its own drop sites carries
+    /// the load there: the target becomes the second target (the caller takes it, then releases
+    /// it as the first), the point clears and `set_state(8)` walks there. Else `set_state(4)`
+    /// walks to the target. A farm another farmer works (with this one, two or more) is walked
+    /// to only as a point (`set_state(11)`, [`GatherAction::set_walk_back`]) and let go. A Gather
+    /// whose constructor held no target (one past state 6) searches (`set_state(3)`), which the
+    /// caller runs on the gatherer's step ([`GatherOpening::Searches`]).
     ///
     /// # Errors
     ///
@@ -268,23 +268,11 @@ impl GatherAction {
             target,
             player,
             player_kind,
-            carry_rule,
+            settings,
             held,
             walks,
         } = start;
-        let kind = self.task.resource;
-        let both_food = both_food(kind, held.kind);
-        let drops = player_kind.is_computer() && held.amount == Amount::ZERO;
-        if (!carry_rule && !drops) || held.kind == kind || both_food {
-            if held.kind != kind && both_food {
-                held.kind = kind;
-            }
-        } else {
-            *held = Held {
-                kind,
-                amount: Amount::ZERO,
-            };
-        }
+        *held = load_for_task(*held, self.task.resource, settings, player_kind);
         // the farm's test and the walks read the target: without one, set_state(3)
         if self.target.is_none() {
             return Ok(GatherOpening::Searches);
@@ -301,15 +289,8 @@ impl GatherAction {
             .contains(ClassRoles::FARM)
             && WorkerCount::ONE < target.workers.plus(1)
         {
-            let radius = if roles
-                .of_master(target.master)
-                .contains(MasterRoles::STOP_FARM)
-            {
-                0.0
-            } else {
-                target.radius.x()
-            };
-            self.set_walk_back(Distance::new(radius), mover, &walks, move_to_tuning)?;
+            let radius = walk_back_radius(target.master, target.radius, roles);
+            self.set_walk_back(radius, mover, &walks, move_to_tuning)?;
             self.target = None;
             return Ok(GatherOpening::Approaches);
         }
@@ -410,15 +391,8 @@ impl GatherAction {
             && taken.is_some()
             && WorkerCount::ONE < workers
         {
-            let radius = if roles
-                .of_master(target.master)
-                .contains(MasterRoles::STOP_FARM)
-            {
-                0.0
-            } else {
-                target.radius.x()
-            };
-            self.set_walk_back(Distance::new(radius), mover, &walks, move_to_tuning)?;
+            let radius = walk_back_radius(target.master, target.radius, roles);
+            self.set_walk_back(radius, mover, &walks, move_to_tuning)?;
             self.target = None;
             self.carry_to = None;
             return Ok(());

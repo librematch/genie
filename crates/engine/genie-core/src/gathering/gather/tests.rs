@@ -5,6 +5,7 @@ use crate::gathering::FarmStops;
 use crate::gathering::gather::WalkEnd;
 use crate::gathering::hunt::tests::walker;
 use crate::gathering::hunt::{DropOff, resource_kind};
+use crate::gathering::tests::settings;
 use crate::map::DistanceSquared;
 use crate::math::Angle;
 use crate::math::rng::{Stream, Well512};
@@ -28,9 +29,11 @@ use crate::objects::layers::{Action, Motion, Static};
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::WorkValue;
+use crate::objects::masters::{Master, Masters};
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame};
+use crate::orders::object_gone;
 use crate::players::attribute::AttributeId;
 use crate::test_ids::carrying;
 use crate::test_ids::class_of;
@@ -44,13 +47,20 @@ use crate::testing::ids;
 use crate::testing::roles;
 use crate::testing::slots;
 use crate::testing::tuning;
+use crate::unit_ai::Answer;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::UnitStance;
+use crate::unit_ai::{AiAction, NotifyKind};
 use crate::world::WorldTime;
 use crate::world::layer::{ClassRoles, MasterRoles, Roles};
 use crate::world::settings::FarmMode;
+use crate::world::settings::Settings;
 use crate::world::step::Step;
 use crate::world::tests::in_update;
+use crate::world::tests::{delete_head_at, forage_world, wait_over};
 use crate::world::{Player, World};
+use std::mem::take;
+use std::sync::Arc;
 
 /// What a human player's villager's Gather reads (master 83, class 4): work rate 0.31, capacity
 /// 10, no productivity attribute, no sprites, outside the game's farm setting.
@@ -497,7 +507,7 @@ fn gather_start_without_target_searches() {
                 target: &removed,
                 player: PlayerId::new(1),
                 player_kind: PlayerKind::Human,
-                carry_rule: false,
+                settings: &Settings::default(),
                 held: &mut held,
                 walks: carried,
             },
@@ -1717,7 +1727,7 @@ fn forager_walks_to_its_bush() {
             target: &bush(),
             player: PlayerId::new(7),
             player_kind: PlayerKind::Human,
-            carry_rule: false,
+            settings: &Settings::default(),
             held: &mut held,
             walks: carried,
         },
@@ -1757,7 +1767,7 @@ fn forager_walks_to_its_bush() {
             target: &bush(),
             player: PlayerId::new(7),
             player_kind: PlayerKind::Human,
-            carry_rule: false,
+            settings: &Settings::default(),
             held: &mut held,
             walks: carried,
         },
@@ -2401,4 +2411,177 @@ fn farm_wait_walks_within_target_radius_or_idles() {
         (gather_action.state.bare(), gather_action.timer),
         (GatherState::FarmWait, Seconds::ZERO)
     );
+}
+
+/// The forager 9175 of [`forage_world`] (player 1, slot 0).
+const FORAGER: ObjectId = object_id(9175);
+
+/// The bush 600 of [`forage_world`].
+const BUSH: ObjectId = object_id(600);
+
+/// [`forage_world`]'s forager on the bush (the gather command's Gather walking to it: state 4,
+/// its `MoveTo` under way), `gather` changing it, under a wait for a foundation
+/// ([`wait_over`]); the forager carrying `held` and its animation at 1.0.
+fn forager_under_wait(held: Held, gather: impl FnOnce(&mut GatherAction)) -> World {
+    let mut world = forage_world();
+    assert_eq!(
+        world.gather_command(PlayerId::new(1), ListIndex::FIRST, BUSH, OrderForce::Forced),
+        Ok(Answer::Taken)
+    );
+    let list = &mut world.parts.actions.of_mut(FORAGER).unwrap().list;
+    let gathering = list.gather_mut().unwrap();
+    assert!(matches!(
+        gathering.state,
+        GatherState::Walk { move_to: Some(_) }
+    ));
+    gather(gathering);
+    *list = wait_over(take(list));
+    let forager = world.object_mut(FORAGER).unwrap().1;
+    (forager.life.attribute_kind, forager.life.amount) = (held.kind, held.amount);
+    world.parts.set_anim_speed(FORAGER, Speed::new(1.0));
+    world
+}
+
+/// The forager's Gather, what it carries, the notifies its unit AI heard and its animation
+/// speed.
+fn forager_after(world: &World) -> (GatherAction, Held, Vec<(NotifyKind, [i32; 3])>, Speed) {
+    let list = &world.parts.actions_of(FORAGER).list;
+    assert_eq!(list.iter().count(), 1);
+    let heard = world
+        .parts
+        .unit_ai
+        .get(FORAGER)
+        .unwrap()
+        .notifies
+        .iter()
+        .map(|notify| (notify.kind, notify.params))
+        .collect();
+    (
+        *list.gather().unwrap(),
+        world.object(FORAGER).unwrap().1.life.held(),
+        heard,
+        world.parts.mover_of(FORAGER).unwrap().animated.speed,
+    )
+}
+
+/// The bush's workers.
+fn bush_workers(world: &World) -> WorkerCount {
+    world.object(BUSH).unwrap().1.workers
+}
+
+/// A deleted head over a Gather restarts it (`0x140a8b3a0` with 0): the forager's load of another
+/// food takes the task's kind (17), its amount kept, or with the carry rule a load of wood goes;
+/// then `set_state(3)`: its `MoveTo` goes and stops the forager, the unit AI hears notify 0x202
+/// with the gather and the target type (class 7), and the timer waits 10 s. The Gather keeps its
+/// bush.
+#[test]
+fn deleted_head_over_gather_takes_task_load_then_searches() {
+    let food = AttributeId::named(17);
+    for (held, force_drop, kept) in [
+        (
+            carrying(Some(attribute::FOOD), 5.0),
+            false,
+            carrying(Some(food), 5.0),
+        ),
+        (
+            carrying(Some(attribute::WOOD), 5.0),
+            true,
+            carrying(Some(food), 0.0),
+        ),
+    ] {
+        let mut world = forager_under_wait(held, |_| {});
+        world.settings = settings(force_drop);
+        delete_head_at(&mut world, PlayerId::new(1), ListIndex::FIRST).unwrap();
+        let (gather, held, heard, animation) = forager_after(&world);
+        assert_eq!(
+            (gather.state, gather.timer, gather.target),
+            (
+                GatherState::Search,
+                Seconds::new(-10.0),
+                Some(GatherTargetId::new(BUSH))
+            )
+        );
+        assert_eq!(held, kept);
+        assert_eq!(
+            heard
+                .iter()
+                .map(|&(kind, [action, class, _])| (kind, action, class))
+                .collect::<Vec<_>>(),
+            [(NotifyKind::REQUIRES_SEARCH, AiAction::Gather.value(), 7)]
+        );
+        assert_eq!(animation, Speed::ZERO);
+        assert_eq!(bush_workers(&world), WorkerCount::ONE);
+    }
+}
+
+/// A Gather of the farm class 49 (`+0x68`) on a target that two or more work walks back to its
+/// point as to a point only: `set_state(11)`, a quiet `MoveTo` there within the target's radius
+/// on x (0.5) plus the task's range (0.25), none for a stop farm (master 50); then the farm goes
+/// and is let go at once (a worker less). The unit AI hears nothing.
+#[test]
+fn deleted_head_over_gather_on_farm_two_work_walks_back_and_lets_it_go() {
+    for (stop_farm, range) in [(false, 0.75), (true, 0.25)] {
+        let mut world = forager_under_wait(carrying(Some(attribute::FOOD), 5.0), |gather| {
+            gather.target_class = Some(class::FARM);
+        });
+        if stop_farm {
+            for masters in &mut world.model.masters {
+                let farm = Master {
+                    id: ids::FARM,
+                    class: class::FARM,
+                    radius: Footprint::new(1.5, 1.5),
+                    ..Master::default()
+                };
+                *masters = Arc::new(Masters::new(masters.iter().cloned().chain([farm])));
+            }
+            world.object_mut(BUSH).unwrap().1.life.master_id = ids::FARM;
+        }
+        world.object_mut(BUSH).unwrap().1.workers = WorkerCount::of_data(2);
+        delete_head_at(&mut world, PlayerId::new(1), ListIndex::FIRST).unwrap();
+        let (gather, held, heard, _) = forager_after(&world);
+        let walk = match gather.state {
+            GatherState::WalkBack { move_to } => move_to,
+            _ => None,
+        };
+        assert_eq!(
+            walk.map(|move_to| (move_to.point, move_to.range, move_to.target)),
+            Some((gather.point, Distance::new(range), None)),
+            "{stop_farm}"
+        );
+        assert_eq!(gather.target, None);
+        assert_eq!(held, carrying(Some(AttributeId::named(17)), 5.0));
+        assert_eq!(heard, []);
+        assert_eq!(bush_workers(&world), WorkerCount::ONE);
+    }
+}
+
+/// A Gather of the farm class on a target that one works searches, and so does one of another
+/// class on a target the world does not hold, which it does not read; a farm the world does not
+/// hold fails the restart.
+#[test]
+fn deleted_head_over_gather_reads_its_target_only_for_farm_class() {
+    let mut world = forager_under_wait(carrying(Some(attribute::FOOD), 5.0), |gather| {
+        gather.target_class = Some(class::FARM);
+    });
+    delete_head_at(&mut world, PlayerId::new(1), ListIndex::FIRST).unwrap();
+    let (gather, _, _, _) = forager_after(&world);
+    assert_eq!(
+        (gather.state, gather.target),
+        (GatherState::Search, Some(GatherTargetId::new(BUSH)))
+    );
+    let lacking = Some(GatherTargetId::new(object_id(99)));
+    let mut world = forager_under_wait(carrying(Some(attribute::FOOD), 5.0), |gather| {
+        gather.target = lacking;
+    });
+    delete_head_at(&mut world, PlayerId::new(1), ListIndex::FIRST).unwrap();
+    let (gather, _, _, _) = forager_after(&world);
+    assert_eq!(
+        (gather.state, gather.target),
+        (GatherState::Search, lacking)
+    );
+    let mut world = forager_under_wait(carrying(Some(attribute::FOOD), 5.0), |gather| {
+        (gather.target, gather.target_class) = (lacking, Some(class::FARM));
+    });
+    let error = delete_head_at(&mut world, PlayerId::new(1), ListIndex::FIRST).unwrap_err();
+    assert_eq!(error.reason(), object_gone(object_id(99)).reason());
 }

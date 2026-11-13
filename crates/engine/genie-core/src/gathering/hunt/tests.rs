@@ -7,6 +7,7 @@ use crate::gathering::DropSiteId;
 use crate::gathering::gather::Walks;
 use crate::gathering::hunt::DecayRule;
 use crate::gathering::hunt::HUNT;
+use crate::gathering::tests::settings;
 use crate::map::Footprint;
 use crate::map::Radii;
 use crate::map::RestrictionId;
@@ -46,23 +47,32 @@ use crate::testing::class;
 use crate::testing::ids;
 use crate::unit_ai::UnitStance;
 use crate::world::WorldTime;
+use crate::world::settings::Settings;
 
+use crate::combat::attack::Attack;
 use crate::combat::attack::tests::Rig;
 use crate::combat::attack::tests::reads;
 use crate::map::spatial::Spatial;
 use crate::movement::{Me, MoveStats, Velocity};
 use crate::movement::{SubstituteCount, WaitDelays};
+use crate::objects::WorkerCount;
 use crate::objects::facing::SpriteFacets;
 use crate::objects::layers::{Animated, Motion, Static};
 use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame};
+use crate::orders::object_gone;
 use crate::test_ids::task_id;
 use crate::testing::model;
 use crate::testing::roles;
 use crate::testing::slots;
 use crate::testing::tuning;
+use crate::unit_ai::AiAction;
+use crate::unit_ai::Answer;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::{NotifyKind, UnitAi};
 use crate::world::World;
+use crate::world::tests::{delete_head_at, hunt_world, wait_over};
+use std::mem::take;
 
 /// The reads of a human player's hunt ([`HuntReads`]): a work rate and a productivity of 1, a
 /// capacity of 10, its unit AI's target class −1, no sprites, the Attack's of
@@ -392,7 +402,7 @@ fn started(target: &Quarry, held: &mut Held, mover: &mut Mover) -> HuntAction {
                 target,
                 player: PlayerId::new(2),
                 player_kind: PlayerKind::Human,
-                carry_rule: false,
+                settings: &Settings::default(),
                 held,
                 walks: walks(Held::default()),
             },
@@ -638,7 +648,7 @@ fn hunt_new_target_clears_its_lead() {
 
 #[test]
 fn hunter_keeps_another_food_it_carries_and_drops_the_rest_by_the_settings() {
-    let start = |held: Held, carry_rule: bool| {
+    let start = |held: Held, force_drop: bool| {
         let mut held = held;
         let _ = HuntAction::new(CHOP, &tree())
             .start(
@@ -646,7 +656,7 @@ fn hunter_keeps_another_food_it_carries_and_drops_the_rest_by_the_settings() {
                     target: &tree(),
                     player: PlayerId::new(2),
                     player_kind: PlayerKind::Human,
-                    carry_rule,
+                    settings: &settings(force_drop),
                     held: &mut held,
                     walks: walks(Held::default()),
                 },
@@ -2372,4 +2382,145 @@ fn dying_hunter_makes_no_move_to() {
             .map(|move_to_action| move_to_action.state),
         Some(MoveTo::Start)
     );
+}
+
+/// The hunter 9175 of [`hunt_world`] (player 1, slot 0).
+const HUNTER: ObjectId = object_id(9175);
+
+/// The deer 500 of [`hunt_world`].
+const DEER: ObjectId = object_id(500);
+
+/// [`hunt_world`]'s hunter on the deer (the hunt command's Hunt, attacking it first: state 12,
+/// its Attack's `MoveTo` under way) on a task of meat, `hunt` changing it, under a wait for a
+/// foundation ([`wait_over`]); the deer holding `amount`, the hunter carrying `held` and its
+/// animation at 1.0.
+fn hunter_under_wait(amount: f32, held: Held, hunt: impl FnOnce(&mut HuntAction)) -> World {
+    let mut world = hunt_world();
+    assert_eq!(
+        world.hunt_command(
+            PlayerId::new(1),
+            ListIndex::FIRST,
+            Some(DEER),
+            OrderForce::Forced
+        ),
+        Ok(Answer::Taken)
+    );
+    let list = &mut world.parts.actions.of_mut(HUNTER).unwrap().list;
+    let hunting = list.hunt_mut().unwrap();
+    assert!(matches!(
+        hunting.state,
+        HuntState::Attack {
+            attack: Some(Attack {
+                state: AttackState::Move { move_to: Some(_) },
+                ..
+            })
+        }
+    ));
+    hunting.task.resource = Some(attribute::MEAT);
+    hunt(hunting);
+    *list = wait_over(take(list));
+    world.object_mut(DEER).unwrap().1.life.amount = Amount::new(amount);
+    let hunter = world.object_mut(HUNTER).unwrap().1;
+    (hunter.life.attribute_kind, hunter.life.amount) = (held.kind, held.amount);
+    world.parts.set_anim_speed(HUNTER, Speed::new(1.0));
+    world
+}
+
+/// The hunter's Hunt, what it carries, the notifies its unit AI heard and its animation speed.
+fn hunter_after(world: &World) -> (HuntAction, Held, Vec<(NotifyKind, [i32; 3])>, Speed) {
+    let list = &world.parts.actions_of(HUNTER).list;
+    assert_eq!(list.iter().count(), 1);
+    let heard = world
+        .parts
+        .unit_ai
+        .get(HUNTER)
+        .unwrap()
+        .notifies
+        .iter()
+        .map(|notify| (notify.kind, notify.params))
+        .collect();
+    (
+        *list.hunt().unwrap(),
+        world.object(HUNTER).unwrap().1.life.held(),
+        heard,
+        world.parts.mover_of(HUNTER).unwrap().animated.speed,
+    )
+}
+
+/// A deleted head over a Hunt restarts it (`0x140ac49b0` with 0): on a target that holds
+/// something the hunter's load of another food takes the task's kind, its amount kept; then
+/// `set_state(3)`: its Attack goes (its `MoveTo` stops the hunter), the unit AI hears notify
+/// 0x202 with the hunt and the target's class (its drop site is the task
+/// hunt-search-drop-site's), and the timer waits 10 s. The hunt keeps its target.
+#[test]
+fn deleted_head_over_hunt_takes_task_load_from_target_holding_something_then_searches() {
+    let mut world = hunter_under_wait(100.0, carrying(Some(attribute::FOOD), 7.0), |_| {});
+    delete_head_at(&mut world, PlayerId::new(1), ListIndex::FIRST).unwrap();
+    let (hunt, held, heard, animation) = hunter_after(&world);
+    assert_eq!(
+        (hunt.state, hunt.timer, hunt.target),
+        (
+            HuntState::Search,
+            Seconds::new(-10.0),
+            Some(HuntTargetId::new(DEER))
+        )
+    );
+    assert_eq!(held, carrying(Some(attribute::MEAT), 7.0));
+    assert_eq!(
+        heard
+            .iter()
+            .map(|&(kind, [action, class, _])| (kind, action, class))
+            .collect::<Vec<_>>(),
+        [(NotifyKind::REQUIRES_SEARCH, AiAction::Hunt.value(), 9)]
+    );
+    assert_eq!(animation, Speed::ZERO);
+}
+
+/// A target that holds nothing (0, or a NaN: `COMISS` and `JBE`) leaves the hunter's load as it
+/// is; the restart searches all the same.
+#[test]
+fn deleted_head_over_hunt_on_target_holding_nothing_keeps_load() {
+    for amount in [0.0, f32::NAN] {
+        let mut world = hunter_under_wait(amount, carrying(Some(attribute::FOOD), 7.0), |_| {});
+        delete_head_at(&mut world, PlayerId::new(1), ListIndex::FIRST).unwrap();
+        let (hunt, held, _, _) = hunter_after(&world);
+        assert_eq!(hunt.state, HuntState::Search, "{amount}");
+        assert_eq!(held, carrying(Some(attribute::FOOD), 7.0), "{amount}");
+    }
+}
+
+/// A Hunt without a target reads no load (the carry rule on, another resource carried) and
+/// searches; one whose target the world does not hold fails the restart.
+#[test]
+fn deleted_head_over_hunt_without_target_searches_and_over_one_world_lacks_fails() {
+    let mut world = hunter_under_wait(100.0, carrying(Some(attribute::STONE), 7.0), |hunt| {
+        hunt.target = None;
+    });
+    world.settings = settings(true);
+    delete_head_at(&mut world, PlayerId::new(1), ListIndex::FIRST).unwrap();
+    let (hunt, held, _, _) = hunter_after(&world);
+    assert_eq!((hunt.state, hunt.target), (HuntState::Search, None));
+    assert_eq!(held, carrying(Some(attribute::STONE), 7.0));
+    let mut world = hunter_under_wait(100.0, carrying(Some(attribute::STONE), 7.0), |hunt| {
+        hunt.target = Some(HuntTargetId::new(object_id(99)));
+    });
+    let error = delete_head_at(&mut world, PlayerId::new(1), ListIndex::FIRST).unwrap_err();
+    assert_eq!(error.reason(), object_gone(object_id(99)).reason());
+}
+
+/// A human player's Hunt of class 10 (`+0x68`) restarts to its end: `set_state(3)` is
+/// `set_state(2)` there, which lets the deer go (a worker less) and clears the point.
+#[test]
+fn deleted_head_over_predator_hunt_of_human_player_ends_it() {
+    let mut world = hunter_under_wait(100.0, carrying(Some(attribute::FOOD), 7.0), |hunt| {
+        hunt.target_class = Some(class::PREDATOR);
+    });
+    delete_head_at(&mut world, PlayerId::new(1), ListIndex::FIRST).unwrap();
+    let (hunt, held, _, _) = hunter_after(&world);
+    assert_eq!(
+        (hunt.state, hunt.target, hunt.point),
+        (HuntState::Idle, None, Position::new(-1.0, -1.0, -1.0))
+    );
+    assert_eq!(held, carrying(Some(attribute::MEAT), 7.0));
+    assert_eq!(world.object(DEER).unwrap().1.workers, WorkerCount::ZERO);
 }

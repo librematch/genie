@@ -301,15 +301,18 @@ impl Unit {
     /// Transport's (`FUN_140aa3e10`) idles ([`Unit::restart_transport`]) and the missile's
     /// (`0x140a9c5b0`) flies ([`MissileAction::restart`]). A `MoveTo` of its own (`0x140aa2100`)
     /// walks and updates at once ([`Unit::restart_move_to`]); an Enter (`0x140a86f20`) starts again
-    /// on its target ([`Unit::restart_enter`]). Nothing for an empty list.
+    /// on its target ([`Unit::restart_enter`]). A Hunt (`0x140ac49b0`) takes the task's load from
+    /// a target that holds something and searches ([`Unit::hunt_begin_search`]); a Gather
+    /// (`0x140a8b3a0`) takes it, then walks off a farm that others work too or searches
+    /// ([`Unit::restart_gather`]). Nothing for an empty list.
     ///
     /// [`MakeAction::first`]: crate::gathering::make::MakeAction::first
     /// [`MissileAction::restart`]: crate::combat::missile::MissileAction::restart
     ///
     /// # Errors
     ///
-    /// An owner the world lacks, the Explore's, the Transport's, the `MoveTo`'s and the Enter's,
-    /// and the restart of any other kind, which is not ported.
+    /// An owner the world lacks, the Explore's, the Transport's, the `MoveTo`'s, the Enter's,
+    /// the Hunt's and the Gather's, and the restart of any other kind, which is not ported.
     pub(crate) fn restart_head(
         &mut self,
         actions: &mut LayersAction,
@@ -336,6 +339,8 @@ impl Unit {
             }
             Some(Action::MoveTo(_)) => self.restart_move_to(actions, step),
             Some(Action::Enter(_)) => self.restart_enter(actions, step),
+            Some(&mut Action::Hunt(hunt)) => self.hunt_begin_search(hunt, actions, step),
+            Some(&mut Action::Gather(gather)) => self.restart_gather(gather, actions, step),
             Some(head) => Err(GenieError::unreachable(NEXT_HEAD).with("kind", head.kind())),
         }
     }

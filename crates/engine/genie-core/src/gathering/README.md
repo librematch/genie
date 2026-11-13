@@ -58,6 +58,7 @@ food to its Make (`pasture.rs`, `World::hand_livestock_food_to_make`, from
 | [`pasture_id.rs`](pasture_id.rs) | A pasture's id as its own type: the building whose livestock a unit is in or tends. |
 | [`queue_count.rs`](queue_count.rs) | The count of farms or fish traps a queue paid for. |
 | [`salvage_amounts.rs`](salvage_amounts.rs) | What a salvage pile holds of six attributes. |
+| [`tests.rs`](tests.rs) | Tests. |
 | [`closest_resource/`](closest_resource/) | The resource search's tests. |
 | [`drop_off/`](drop_off/) | The drop-off's tests. |
 | [`gather/`](gather/) | The Gather action (`RGE_Action_Gather`, type 5, vtable `0x142ed4f28`): a forager sent to a resource walks to it (state 4, a quiet `MoveTo`), faces it (6), gathers (7), takes the load to a drop site (8) and walks back to the resource (4). |
@@ -69,6 +70,6 @@ food to its Make (`pasture.rs`, `World::hand_livestock_food_to_make`, from
 ## How it connects
 
 <!-- uses -->
-- Uses: [`combat`](../combat/), [`construction`](../construction/), [`groups`](../groups/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`objects`](../objects/), [`pathing`](../pathing/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`testing`](../testing/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
+- Uses: [`combat`](../combat/), [`construction`](../construction/), [`groups`](../groups/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`pathing`](../pathing/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`testing`](../testing/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
 - Used by: [`combat`](../combat/), [`commands`](../commands/), [`construction`](../construction/), [`groups`](../groups/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`testing`](../testing/), [`unit_ai`](../unit_ai/), [`world`](../world/).
 <!-- /uses -->
