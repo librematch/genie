@@ -8,6 +8,7 @@ use crate::gathering::drop_sites::DROP_SITE_UNPLACED;
 use crate::gathering::hunt::resource_kind;
 use crate::map::Distance;
 use crate::math::fmath::below_or_unordered;
+use crate::math::rng::Stream;
 use crate::movement::Me;
 use crate::movement::Speed;
 use crate::movement::move_to::{SubCode, TargetMoved};
@@ -340,7 +341,7 @@ impl BuildAction {
                     && gone.contains(&queued_order.target))
             });
             if !ai.orders.is_empty() {
-                ai.end_order_and_action()?;
+                ai.end_order_and_action(step.world.streams.get_mut(Stream::Ai));
                 // 1: the action is done.
                 self.end(step, builder, BuildState::Done)?;
                 return Ok(HeadCode::Deletes);

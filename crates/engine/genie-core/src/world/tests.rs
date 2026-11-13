@@ -250,6 +250,7 @@ use crate::test_ids::task_key;
 use crate::test_ids::tech_id;
 use crate::test_ids::unit_list;
 use crate::test_ids::{adds as test_ids_adds, amounts, attributes};
+use crate::testing::ai::{assert_patrol_end, on_patrol_timers};
 use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::ids;
@@ -23182,8 +23183,15 @@ fn an_explore_walks_to_its_point_then_asks_for_the_next() {
 
 /// A hunter back from its drop-off without a deer (`hunt.target` -1, the deer it hunted let
 /// go): both deer seen by player 1, the hunter with a sight of 4, the mesh built. `setup` changes
-/// the hunter and its unit AI before [`Unit::hunt_after_drop`] runs.
+/// the hunter and its unit AI before [`Unit::hunt_after_drop`] runs ([`update_after_drop`]).
 fn hunted_without_deer(setup: impl FnOnce(&mut Action, &mut UnitAi)) -> World {
+    let mut world = without_deer_ready(setup);
+    update_after_drop(&mut world);
+    world
+}
+
+/// [`hunted_without_deer`]'s world before the hunter's update after its drop-off.
+fn without_deer_ready(setup: impl FnOnce(&mut Action, &mut UnitAi)) -> World {
     let mut world = hunt_world();
     world.spatial.relations = ByPlayer::new(vec![relation_row([0, 3]), relation_row([3, 0])]);
     world.spatial.unit_diplomacy = ByPlayer::new(vec![relations([1, 4]), relations([4, 1])]);
@@ -23252,8 +23260,14 @@ fn hunted_without_deer(setup: impl FnOnce(&mut Action, &mut UnitAi)) -> World {
     let ai = world.parts.unit_ai.get_mut(players.id).unwrap();
     ai.target_class = None;
     setup(actions, ai);
+    world
+}
+
+/// The hunter's update after its drop-off ([`Unit::hunt_after_drop`]) and the end of its head's
+/// update.
+fn update_after_drop(world: &mut World) {
     in_update(
-        &mut world,
+        world,
         (PlayerId::new(1), ListIndex::new(0)),
         50,
         |unit, actions, step| {
@@ -23263,7 +23277,6 @@ fn hunted_without_deer(setup: impl FnOnce(&mut Action, &mut UnitAi)) -> World {
         },
     )
     .unwrap();
-    world
 }
 
 /// The hunt's state, target and drop site after [`hunted_without_deer`], and the two deer's
@@ -23307,21 +23320,9 @@ fn hunter_without_its_deer_after_the_drop_takes_the_closest_one() {
 /// runs it; one on a target gone leaves the queue (`FUN_140c5de60`) and the search runs.
 #[test]
 fn hunter_with_queued_order_after_the_drop_ends_its_hunt() {
-    let order = |target: i32| QueuedOrder {
-        issuer: Some(Issuer::Player(player_id(1))),
-        order: OrderKind::Hunt,
-        priority: OrderPriority::of_data(100),
-        target: ObjectId::of_field(target),
-        target_owner: owner(0),
-        point: Position::new(36.5, 89.5, 0.0),
-        range: Distance::ZERO,
-        shown: Point::new(36.5, 89.5),
-        ready: true,
-        target_kind: order_kind(9),
-    };
-    let held = hunted_without_deer(|_, ai| ai.orders = vec![order(501)]);
+    let held = hunted_without_deer(|_, ai| ai.orders = vec![hunt_order(501)]);
     assert_eq!(hunt_after(&held), (None, [0, 0]));
-    let gone = hunted_without_deer(|_, ai| ai.orders = vec![order(999)]);
+    let gone = hunted_without_deer(|_, ai| ai.orders = vec![hunt_order(999)]);
     assert_eq!(
         gone.parts
             .unit_ai
@@ -23335,6 +23336,36 @@ fn hunter_with_queued_order_after_the_drop_ends_its_hunt() {
         hunt_after(&gone),
         (Some((HuntState::Attack { attack: None }, 500, -1)), [1, 0])
     );
+}
+
+/// The hunt's end with a queued order after the drop leaves a patrol order as the order setter
+/// does ([`assert_patrol_end`]).
+#[test]
+fn hunter_ending_after_the_drop_leaves_patrol_order() {
+    assert_patrol_end(|order, adjusted| {
+        let mut world = without_deer_ready(|_, ai| ai.orders = vec![hunt_order(501)]);
+        let id = world.players[1].objects[ListIndex::new(0)].id;
+        on_patrol_timers(&mut world, id, order, adjusted);
+        update_after_drop(&mut world);
+        assert_eq!(hunt_after(&world), (None, [0, 0]));
+        (world, id)
+    });
+}
+
+/// Player 1's queued order to hunt `target` (none for −1).
+fn hunt_order(target: i32) -> QueuedOrder {
+    QueuedOrder {
+        issuer: Some(Issuer::Player(player_id(1))),
+        order: OrderKind::Hunt,
+        priority: OrderPriority::of_data(100),
+        target: ObjectId::of_field(target),
+        target_owner: owner(0),
+        point: Position::new(36.5, 89.5, 0.0),
+        range: Distance::ZERO,
+        shown: Point::new(36.5, 89.5),
+        ready: true,
+        target_kind: order_kind(9),
+    }
 }
 
 /// A hunt of class 10 searches nothing after the drop, and a wood search finds no tree: either

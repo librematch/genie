@@ -450,7 +450,7 @@ impl Unit {
         if ai.orders.is_empty() {
             return Ok(ActionEnd::GoesOn);
         }
-        ai.end_order_and_action()?;
+        ai.end_order_and_action(step.world.streams.get_mut(Stream::Ai));
         Ok(ActionEnd::Ends)
     }
 

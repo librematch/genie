@@ -244,7 +244,7 @@ impl BuildAction {
             self.search(step, builder, actions, (found, reads), roles)?;
             return Ok(HeadCode::Keeps);
         }
-        ai.end_order_and_action()?;
+        ai.end_order_and_action(step.world.streams.get_mut(Stream::Ai));
         self.end(step, builder, BuildState::Done)?;
         Ok(HeadCode::Deletes)
     }
@@ -365,7 +365,7 @@ impl BuildAction {
     ///
     /// # Errors
     ///
-    /// A unit AI on a patrol order, and what the prelude and the sprite do not model.
+    /// What the prelude and the sprite do not model.
     pub(super) fn idle(
         &mut self,
         step: &mut Step<'_>,
@@ -380,7 +380,7 @@ impl BuildAction {
             drop_done_orders(ai, built, &reads.build_targets);
             left = ai.orders.len();
             if left != 0 {
-                ai.end_order_and_action()?;
+                ai.end_order_and_action(step.world.streams.get_mut(Stream::Ai));
                 self.end(step, builder, BuildState::Done)?;
             }
         }

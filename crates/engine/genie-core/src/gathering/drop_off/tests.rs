@@ -24,6 +24,7 @@ use crate::test_ids::class_id;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::{order_kind, owner, player_id};
+use crate::testing::ai::{assert_patrol_end, on_patrol_timers};
 use crate::testing::attribute;
 use crate::testing::roles;
 use crate::unit_ai::{AiAction, Issuer, OrderPriority, QueuedOrder};
@@ -442,7 +443,7 @@ fn after_drop_orders_leave_on_targets_gone_and_end_gather_with_orders_left() {
             &mut world,
             (PlayerId::new(1), ListIndex::new(0)),
             50,
-            |unit, _, step| unit.after_drop_orders(step),
+            |unit, _, step| Ok(unit.after_drop_orders(step)),
         );
         let ai = world.parts.unit_ai.get(id).unwrap();
         let left: Vec<_> = ai
@@ -479,4 +480,25 @@ fn after_drop_orders_leave_on_targets_gone_and_end_gather_with_orders_left() {
             (None, None)
         )
     );
+}
+
+/// The Gather's end with orders left leaves a patrol order as the order setter does
+/// ([`assert_patrol_end`]).
+#[test]
+fn after_drop_end_leaves_patrol_order() {
+    assert_patrol_end(|order, adjusted| {
+        let mut world = foraging();
+        let id = forager(&world).id;
+        world.parts.unit_ai.get_mut(id).unwrap().orders =
+            vec![queued(OrderKind::Move, Some(object_id(602)))];
+        on_patrol_timers(&mut world, id, order, adjusted);
+        let ended = in_update(
+            &mut world,
+            (PlayerId::new(1), ListIndex::new(0)),
+            50,
+            |unit, _, step| Ok(unit.after_drop_orders(step)),
+        );
+        assert_eq!(ended, Ok(ActionEnd::Ends));
+        (world, id)
+    });
 }

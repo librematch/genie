@@ -1,5 +1,6 @@
 //! A unit AI's construction, its order and target, its patrol and its moves.
 
+use crate::GenieResult;
 use crate::combat::attack::ATTACK;
 use crate::construction::repair::REPAIR;
 use crate::garrison::ENTER;
@@ -44,7 +45,6 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::UnitAiTuning;
 use crate::world::slots::CheckedIndexExt;
-use crate::{GenieError, GenieResult};
 
 /// Whether the order setter ([`UnitAi::set_order_with`]) keeps the order before as the last
 /// (1) or leaves the last as it is (0).
@@ -446,21 +446,14 @@ impl UnitAi {
         self.current_order = order;
     }
 
-    /// The end of a Build whose AI holds queued orders (`0x140ab0370` case 0xdf): no order and no
-    /// action (`FUN_140c64b60` with −1 and 1, `FUN_140c64b50` with −1); leaving a patrol order
-    /// caps the secondary timer ([`UnitAi::cap_patrol_secondary`]); the redraw of an adjusted
-    /// idle timeout of exactly 750 (slot 0x1a8, the AI stream's) is not modelled here.
-    pub const fn end_order_and_action(&mut self) -> GenieResult<()> {
-        if self.patrol_redraws() {
-            return Err(GenieError::unsupported(
-                "the end of a Build on a patrol order",
-            ));
-        }
-        self.cap_patrol_secondary();
-        self.last_order = self.current_order;
-        self.current_order = None;
+    /// The end of an action whose unit AI holds queued orders: no order and no action
+    /// (`FUN_140c64b60` with −1 and 1, [`UnitAi::set_order`]; `FUN_140c64b50` with −1). The
+    /// Build's end calls it (`0x140ab0370` case 0xdf, its pasture branch, its idle and its
+    /// drop-off), and so do the Hunt's and the Gather's drop-offs. Leaving a patrol order (711,
+    /// 733) redraws an adjusted idle timeout of exactly 750 with the AI stream `ai` (slot 0x1a8).
+    pub(crate) fn end_order_and_action(&mut self, ai: &mut Well512) {
+        self.set_order(None, ai);
         self.set_action(None);
-        Ok(())
     }
 
     /// `FUN_140c64b50`.

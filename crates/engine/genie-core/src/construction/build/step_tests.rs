@@ -60,6 +60,7 @@ use crate::players::PlayerId;
 use crate::players::tracker::key;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
+use crate::testing::ai::{assert_patrol_end, on_patrol_timers};
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::ids::PASTURE_1889;
@@ -1216,6 +1217,43 @@ fn builder_waiting_21_times_on_an_occupied_footprint_gives_up() {
 /// load of berries to its player as food and ends (`set_state(1)`, returns 1).
 #[test]
 fn human_builder_of_built_pasture_hands_it_over() {
+    let mut world = built_pasture();
+    let ai = world.parts.unit_ai.get_mut(BUILDER).unwrap();
+    (ai.current_order, ai.current_action) = (Some(OrderKind::Build), Some(AiAction::Build));
+    assert_eq!(code(&mut world, 20), HeadCode::Deletes);
+    let build_action = build(&world);
+    assert_eq!(
+        (build_action.state, build_action.target, build_action.added),
+        (BuildState::Done, None, false)
+    );
+    let built = (
+        NotifyKind::PASTURE_BUILT,
+        [AiAction::Build.value(), 10031, 0],
+    );
+    assert_eq!(heard(&world), [built]);
+    let ai = world.parts.unit_ai.get(builder(&world).id).unwrap();
+    assert_eq!((ai.current_order, ai.current_action), (None, None));
+    assert_eq!((house(&world).0, house(&world).1), (0, 0));
+    assert_eq!(world.players[1].attributes[0], Amount::new(7.0));
+    assert_eq!(builder(&world).life.attribute_kind, None);
+    assert!(stands(&world));
+}
+
+/// The pasture branch's end leaves a patrol order as the order setter does
+/// ([`assert_patrol_end`]).
+#[test]
+fn builder_of_built_pasture_leaves_patrol_order() {
+    assert_patrol_end(|order, adjusted| {
+        let mut world = built_pasture();
+        on_patrol_timers(&mut world, BUILDER, order, adjusted);
+        assert_eq!(code(&mut world, 20), HeadCode::Deletes);
+        (world, BUILDER)
+    });
+}
+
+/// [`site_world`]'s house as a pasture of master 1889, built (its state above 0) and its stack
+/// unit's pasture 10031, its human builder at work carrying 7 of attribute 17.
+fn built_pasture() -> World {
     let build_action = BuildAction {
         state: BuildState::Work,
         added: true,
@@ -1237,25 +1275,7 @@ fn human_builder_of_built_pasture_hands_it_over() {
     layer.stack_made = Some(object_id(10031));
     let unit = own(&mut world, BUILDER);
     (unit.life.attribute_kind, unit.life.amount) = (Some(AttributeId::named(17)), Amount::new(7.0));
-    let ai = world.parts.unit_ai.get_mut(BUILDER).unwrap();
-    (ai.current_order, ai.current_action) = (Some(OrderKind::Build), Some(AiAction::Build));
-    assert_eq!(code(&mut world, 20), HeadCode::Deletes);
-    let build_action = build(&world);
-    assert_eq!(
-        (build_action.state, build_action.target, build_action.added),
-        (BuildState::Done, None, false)
-    );
-    let built = (
-        NotifyKind::PASTURE_BUILT,
-        [AiAction::Build.value(), 10031, 0],
-    );
-    assert_eq!(heard(&world), [built]);
-    let ai = world.parts.unit_ai.get(builder(&world).id).unwrap();
-    assert_eq!((ai.current_order, ai.current_action), (None, None));
-    assert_eq!((house(&world).0, house(&world).1), (0, 0));
-    assert_eq!(world.players[1].attributes[0], Amount::new(7.0));
-    assert_eq!(builder(&world).life.attribute_kind, None);
-    assert!(stands(&world));
+    world
 }
 
 /// The update's case 1 and case 0xc (`0x140ab0370`): a Build its unit's stop halted (state
@@ -1394,6 +1414,61 @@ fn villager_works_the_farm_it_built() {
         world.parts.unit_ai.get(builder(&world).id).unwrap().orders,
         vec![]
     );
+}
+
+/// The end of the work (case 0xdf) on a house, its builder's unit AI holding a hunt order
+/// (`FUN_140c564a0`): no order and no action, a patrol order left as the order setter leaves it
+/// ([`assert_patrol_end`]), and the Build ends (`set_state(1)`, returns 1).
+#[test]
+fn builder_with_orders_left_after_its_work_ends_the_build() {
+    assert_patrol_end(|order, adjusted| {
+        let build_action = BuildAction {
+            state: BuildState::Finished,
+            ..started(HOUSE, AT_HOUSE, Distance::ZERO, TASK)
+        };
+        let mut world = site_world(
+            class::VILLAGER,
+            Position::new(12.0, 10.5, 0.0),
+            build_action,
+        );
+        own(&mut world, HOUSE).life.state = ObjectState::Alive;
+        world.parts.unit_ai.get_mut(BUILDER).unwrap().orders = vec![hunt_order()];
+        on_patrol_timers(&mut world, BUILDER, order, adjusted);
+        assert_eq!(code(&mut world, 20), HeadCode::Deletes);
+        assert_eq!(build(&world).state.bare(), BuildState::Done);
+        (world, BUILDER)
+    });
+}
+
+/// The Build's idle (`set_state(3)`) with orders left in its unit AI's queue: no order and no
+/// action, a patrol order left as the order setter leaves it ([`assert_patrol_end`]), and the
+/// Build is done (`set_state(1)`).
+#[test]
+fn idle_build_with_orders_left_is_done() {
+    assert_patrol_end(|order, adjusted| {
+        let mut world = site_world(
+            class::VILLAGER,
+            Position::new(12.0, 10.5, 0.0),
+            started(HOUSE, AT_HOUSE, Distance::ZERO, TASK),
+        );
+        world.parts.unit_ai.get_mut(BUILDER).unwrap().orders = vec![hunt_order()];
+        on_patrol_timers(&mut world, BUILDER, order, adjusted);
+        on_build(&mut world, |build_action, step, unit, reads| {
+            build_action.idle(step, unit, reads)
+        })
+        .unwrap();
+        assert_eq!(build(&world).state.bare(), BuildState::Done);
+        (world, BUILDER)
+    });
+}
+
+/// A queued order to hunt object 99, which no build order's drop takes.
+fn hunt_order() -> QueuedOrder {
+    QueuedOrder {
+        order: OrderKind::Hunt,
+        target: Some(object_id(99)),
+        ..QueuedOrder::default()
+    }
 }
 
 /// A builder beside its foundation works in its first update (state 6); census v5's 208 stops
@@ -1874,6 +1949,28 @@ fn builder_without_foundation_after_its_drop_off() {
             10.0
         )
     );
+}
+
+/// State 8 without a foundation, its unit AI holding a build order after the load: its end
+/// leaves a patrol order as the order setter does ([`assert_patrol_end`]).
+#[test]
+fn builder_ending_after_its_drop_off_leaves_patrol_order() {
+    assert_patrol_end(|order, adjusted| {
+        let lone = BuildAction {
+            target: None,
+            point: AT_HOUSE,
+            ..at_the_mill(MoveTo::Arrived)
+        };
+        let mut world = drop_world(Position::new(14.0, 10.5, 0.0), lone);
+        world.parts.unit_ai.get_mut(BUILDER).unwrap().orders = vec![QueuedOrder {
+            order: OrderKind::Build,
+            target: Some(object_id(78)),
+            ..QueuedOrder::default()
+        }];
+        on_patrol_timers(&mut world, BUILDER, order, adjusted);
+        assert_eq!(code(&mut world, 250), HeadCode::Deletes);
+        (world, BUILDER)
+    });
 }
 
 /// State 8's quiet `MoveTo` lets a target past state 6 go and returns 5: the drop-off

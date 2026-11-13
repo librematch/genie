@@ -76,7 +76,7 @@ impl Unit {
         roles: &Roles,
     ) -> GenieResult<HeadCode> {
         let by = self.releaser(step)?;
-        if self.after_drop_orders(step)? == ActionEnd::Ends {
+        if self.after_drop_orders(step) == ActionEnd::Ends {
             return Ok(HeadCode::Deletes);
         }
         let Some(found) = self.after_drop_search(&gather, actions, step)? else {
@@ -90,7 +90,7 @@ impl Unit {
     /// does not hold, or one its sight sees past state 5) leave (`FUN_140c5de60`); with orders
     /// left the AI ends its order and action and the Gather is done (its deletion lets the drop
     /// site go). [`ActionEnd::Ends`] when it is.
-    fn after_drop_orders(&self, step: &mut Step<'_>) -> GenieResult<ActionEnd> {
+    fn after_drop_orders(&self, step: &mut Step<'_>) -> ActionEnd {
         let spatial: &Spatial = &step.world.spatial;
         let gone = |id: Option<ObjectId>| match spatial.get(id) {
             None => true,
@@ -101,7 +101,7 @@ impl Unit {
                 .is_some_and(|seer| ObjectState::Dead < seer.state),
         };
         let Some(ai) = step.world.parts.unit_ai.get_mut(self.id) else {
-            return Ok(ActionEnd::GoesOn);
+            return ActionEnd::GoesOn;
         };
         ai.orders.retain(|queued_order| {
             !(matches!(
@@ -110,10 +110,10 @@ impl Unit {
             ) && gone(queued_order.target))
         });
         if ai.orders.is_empty() {
-            return Ok(ActionEnd::GoesOn);
+            return ActionEnd::GoesOn;
         }
-        ai.end_order_and_action()?;
-        Ok(ActionEnd::Ends)
+        ai.end_order_and_action(step.world.streams.get_mut(Stream::Ai));
+        ActionEnd::Ends
     }
 
     /// The unit AI's `ClosestResourceObject` after the drop (slot 0x80: no drop site, any

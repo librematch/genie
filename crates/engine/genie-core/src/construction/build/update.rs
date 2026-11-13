@@ -7,6 +7,7 @@ use crate::construction::FoundationId;
 use crate::construction::build::BuildState;
 use crate::construction::build::{BUILDER_UNMOVING, BuildAction, BuildReads, BuildTask};
 use crate::map::Position;
+use crate::math::rng::Stream;
 use crate::movement::Me;
 use crate::movement::move_to::{GiveUp, MoveToAction, MoveToReads, WalkTo};
 use crate::movement::move_to::{Patience, SubCode};
@@ -175,7 +176,7 @@ impl BuildAction {
         let Some(ai) = step.world.parts.unit_ai.get_mut(builder.id) else {
             return Ok(false);
         };
-        ai.end_order_and_action()?;
+        ai.end_order_and_action(step.world.streams.get_mut(Stream::Ai));
         builder.post_own(
             &mut step.world.parts.unit_ai,
             NotifyKind::PASTURE_BUILT,

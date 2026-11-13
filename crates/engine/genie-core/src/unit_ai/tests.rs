@@ -10635,7 +10635,7 @@ fn leaving_patrol_order_caps_its_secondary_timer() {
     );
     assert_eq!(unit_ai.secondary_timer, Millis::new(900));
     let mut unit_ai = patrolling();
-    unit_ai.end_order_and_action().unwrap();
+    unit_ai.end_order_and_action(&mut rng());
     assert_eq!(
         (
             unit_ai.current_order,
@@ -10643,6 +10643,64 @@ fn leaving_patrol_order_caps_its_secondary_timer() {
             unit_ai.secondary_timer
         ),
         (None, Some(OrderKind::Patrol), Millis::new(750))
+    );
+}
+
+/// The end of an action whose unit AI holds queued orders (`FUN_140c64b60` with −1 and 1, then
+/// `FUN_140c64b50` with −1): leaving a patrol order (711) or an attack move (733) redraws an
+/// adjusted idle timeout of exactly 750 (slot 0x1a8: one draw of the AI stream; a hunted
+/// animal's slot takes 5/4 of its idle timeout and draws nothing) and caps the secondary timer.
+/// Another timeout keeps the timeout, and another order keeps both timers; neither draws.
+#[test]
+fn ending_order_and_action_redraws_patrol_timeout_of_750() {
+    let ended = |order, adjusted, ai_kind| {
+        let mut unit_ai = UnitAi {
+            current_order: Some(order),
+            current_action: Some(AiAction::Build),
+            adjusted_idle_timeout: Millis::new(adjusted),
+            idle_timeout: Millis::new(3000),
+            secondary_timer: Millis::new(900),
+            ..idle(ai_kind)
+        };
+        let mut rng = rng();
+        unit_ai.end_order_and_action(&mut rng);
+        assert_eq!(
+            (
+                unit_ai.current_order,
+                unit_ai.last_order,
+                unit_ai.current_action,
+                unit_ai.last_action
+            ),
+            (None, Some(order), None, Some(AiAction::Build))
+        );
+        (
+            rng.draws,
+            unit_ai.adjusted_idle_timeout.get(),
+            unit_ai.secondary_timer.get(),
+        )
+    };
+    // seed 0's first draw is 7241: 7241 % 1500 + 2250
+    let redrawn = (1, 7241 % 1500 + 2250, 750);
+    assert_eq!(ended(OrderKind::Patrol, 750, UnitAiKind::Soldier), redrawn);
+    assert_eq!(
+        ended(OrderKind::AttackMove, 750, UnitAiKind::Soldier),
+        redrawn
+    );
+    assert_eq!(
+        ended(OrderKind::Patrol, 750, UnitAiKind::Hunted),
+        (0, 3000 * 5 / 4, 750)
+    );
+    assert_eq!(
+        ended(OrderKind::Patrol, 751, UnitAiKind::Soldier),
+        (0, 751, 750)
+    );
+    assert_eq!(
+        ended(OrderKind::AttackMove, 749, UnitAiKind::Soldier),
+        (0, 749, 750)
+    );
+    assert_eq!(
+        ended(OrderKind::Build, 750, UnitAiKind::Civilian),
+        (0, 750, 900)
     );
 }
 

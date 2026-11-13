@@ -400,27 +400,6 @@ impl UnitAi {
         }
     }
 
-    /// On a patrol order (711, 733) with an adjusted idle timeout of exactly 750: leaving the
-    /// order redraws it (slot 0x1a8), which draws from the AI stream.
-    pub(super) const fn patrol_redraws(&self) -> bool {
-        matches!(
-            self.current_order,
-            Some(OrderKind::Patrol | OrderKind::AttackMove)
-        ) && self.adjusted_idle_timeout.get() == 750
-    }
-
-    /// The rest of leaving a patrol order (711, 733) once the redraw is not due
-    /// ([`UnitAi::patrol_redraws`]): the secondary timer is capped at 750 (`0x2ee < (int)+0x16c`).
-    pub(super) const fn cap_patrol_secondary(&mut self) {
-        if matches!(
-            self.current_order,
-            Some(OrderKind::Patrol | OrderKind::AttackMove)
-        ) && 750 < self.secondary_timer.get() as i32
-        {
-            self.secondary_timer = Millis::new(750);
-        }
-    }
-
     /// What leaving a patrol order (711, 733) does to the timers wherever the game sets the
     /// order by hand: an adjusted idle timeout of exactly 750 is redrawn (slot 0x1a8) and the
     /// secondary timer is capped at 750 (`0x2ee < (int)+0x16c`).
