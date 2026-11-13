@@ -117,8 +117,10 @@ pub fn saved_actions(
 }
 
 /// A saved action the slice does not import: one of a type it does not model, or one below the
-/// head (the slice's lists hold one action: the restart of the action under a deleted head, its
-/// slot 0x28, is not ported).
+/// head (the list update's idle update of an action below the head, `FUN_140a78470`, is not
+/// ported: [`Unit::end_head_update`] stops there).
+///
+/// [`Unit::end_head_update`]: crate::objects::unit::Unit::end_head_update
 const fn not_imported() -> GenieError {
     GenieError::unsupported("a saved action the slice does not import")
 }

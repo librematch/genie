@@ -231,9 +231,9 @@ fn second_target_or_an_unknown_action_is_unsupported() {
     );
 }
 
-/// A saved list of two actions: the slice's lists hold one (the restart of the action under a
-/// deleted head, slot 0x28, is not ported), so the import refuses the action below the head
-/// rather than dropping it, and names it.
+/// A saved list of two actions: the list update's idle update of an action below the head
+/// (`FUN_140a78470`) is not ported, so the import refuses the action below the head rather than
+/// dropping it, and names it.
 #[test]
 fn second_saved_action_is_refused() {
     let mut object = acting(MOVE_TO, move_to(2, 0.5));
