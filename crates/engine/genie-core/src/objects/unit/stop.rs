@@ -4,6 +4,7 @@
 use crate::math::rng::{Stream, Well512};
 use crate::movement::Speed;
 use crate::objects::Graphics;
+use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::actions::Action as ActionsAction;
 use crate::objects::layers::Action;
@@ -24,9 +25,10 @@ use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
 impl Unit {
-    /// stopAction (slot 0x3c0, `FUN_14108c160`): the action list goes ([`Unit::tear_down_actions`])
-    /// and a unit in state 2 takes its standing sprite (slot 0x68 with slot 0x798's,
-    /// [`Unit::show_standing`]).
+    /// stopAction (slot 0x3c0, `FUN_14108c160`): the action list goes ([`Unit::tear_down_actions`],
+    /// with the target of the unit AI the world holds: the AI's calls return it there,
+    /// [`crate::unit_ai::world_view::UnitView::effect_now`]) and a unit in state 2 takes its
+    /// standing sprite (slot 0x68 with slot 0x798's, [`Unit::show_standing`]).
     ///
     /// # Errors
     ///
@@ -37,8 +39,8 @@ impl Unit {
         step: &mut Step<'_>,
     ) -> GenieResult<()> {
         let by = self.releaser(step)?;
-        let top = step.world.top_speed(step.player, self)?;
-        self.tear_down_actions(actions, step, top, by)?;
+        let ai_target = step.world.ai_target(self.id);
+        self.tear_down_actions(actions, step, ai_target, by)?;
         if self.life.state == ObjectState::Alive {
             self.show_standing(
                 step.world.parts.motion.layer_mut(self.id),
@@ -55,9 +57,10 @@ impl Unit {
     }
 
     /// The action list's deletion (`FUN_140a98620`) as the unit's own commands and stops run it
-    /// ([`Unit::clear_own_actions`]) on its action layer `actions`, its top speed `top` (slot
-    /// 0x208) and the unit as `by`; an action the slice does not hold has a teardown it cannot
-    /// run (the load could not read it whole, [`crate::world::Unread`]).
+    /// ([`Unit::clear_own_actions`]) on its action layer `actions`, the target `ai_target` of
+    /// its unit AI (which its top speed reads) and the unit as `by`; an action the slice does
+    /// not hold has a teardown it cannot run (the load could not read it whole,
+    /// [`crate::world::Unread`]).
     ///
     /// # Errors
     ///
@@ -66,7 +69,7 @@ impl Unit {
         &mut self,
         actions: &mut Action,
         step: &mut Step<'_>,
-        top: Speed,
+        ai_target: Option<ObjectId>,
         by: Releaser,
     ) -> GenieResult<()> {
         if step.world.parts.unread.contains(self.id) {
@@ -74,7 +77,7 @@ impl Unit {
                 "a unit AI's stop of an action list the slice does not model",
             ));
         }
-        self.clear_own_actions(actions, step, top, by)
+        self.clear_own_actions(actions, step, ai_target, by)
     }
 
     /// The unit's slot 0x68 with its master's standing sprite (slot 0x798's, the master's
@@ -116,28 +119,32 @@ impl Unit {
     /// The action list's deletion (`FUN_140a98620`) from the unit's step, as its death, its stops
     /// and its commands share it: [`Unit::delete_own_head`] until the list is empty, each
     /// destructor ([`crate::objects::actions::Action::tear_down`]) on the unit's motion layer and
-    /// its top speed `top` (slot 0x208 as the deletion starts), what it let go applied at once by
-    /// `by`, then the next head's restart where one is due. A building's production is a list of
-    /// its own, which stays.
+    /// its top speed (slot 0x208, which the Fly's reads) as it stands at that destructor's turn:
+    /// a restart before it can show a sprite. The top speed reads `ai_target`, the target of the
+    /// unit's AI, which a restart only posts to. What each destructor let go is applied at once
+    /// by `by`, then the next head restarts where one is due. A building's production is a list
+    /// of its own, which stays.
     ///
     /// # Errors
     ///
-    /// The deletions'.
+    /// The deletions' and the top speed's.
     pub(crate) fn clear_own_actions(
         &mut self,
         actions: &mut Action,
         step: &mut Step<'_>,
-        top: Speed,
+        ai_target: Option<ObjectId>,
         by: Releaser,
     ) -> GenieResult<()> {
         while !actions.list.is_empty() {
+            let top = step.world.top_speed_with(step.player, self, ai_target)?;
             self.delete_own_head(actions, step, top, by)?;
         }
         Ok(())
     }
 
     /// The action list's deletion (`FUN_140a98620`) on the unit's own list
-    /// ([`Unit::clear_own_actions`]) with its own top speed and the unit as the releaser.
+    /// ([`Unit::clear_own_actions`]) with the target of the unit AI the world holds and the unit
+    /// as the releaser.
     ///
     /// # Errors
     ///
@@ -148,15 +155,16 @@ impl Unit {
         step: &mut Step<'_>,
     ) -> GenieResult<()> {
         let by = self.releaser(step)?;
-        let top = step.world.top_speed(step.player, self)?;
-        self.clear_own_actions(actions, step, top, by)
+        let ai_target = step.world.ai_target(self.id);
+        self.clear_own_actions(actions, step, ai_target, by)
     }
 
     /// `FUN_140a98e20` on the unit's own list from its step: the head's destructor
-    /// ([`ActionList::delete_head`] on its motion layer and its top speed `top`), what it lets go
-    /// applied at once by `by` ([`crate::objects::teardown::TornDown::let_go`]: the game's slot
-    /// 0x180 inside slot 0), then, with another action at the head of a unit below state 3, that
-    /// action's slot 0x28 with 0 ([`Unit::restart_head`]).
+    /// ([`ActionList::delete_head`] on its motion layer and its top speed `top`, slot 0x208 as the
+    /// destructor reads it), what it lets go applied at once by `by`
+    /// ([`crate::objects::teardown::TornDown::let_go`]: the game's slot 0x180 inside slot 0), then,
+    /// with another action at the head of a unit below state 3, that action's slot 0x28 with 0
+    /// ([`Unit::restart_head`]).
     ///
     /// [`ActionList::delete_head`]: crate::objects::actions::ActionList::delete_head
     ///
@@ -184,7 +192,8 @@ impl Unit {
     /// `set_only_action` (slot 0x808, `FUN_14106e990`) on the unit's own list from its update, as
     /// [`crate::world::World::set_only_action`] outside one: the list's deletion
     /// ([`Unit::clear_own_actions`]), then its add ([`admit`]): the new `action` back to start and
-    /// hold below state 3, else deleted unstarted, what its destructor left applied at once.
+    /// hold below state 3, else deleted unstarted (its destructor reads the top speed after the
+    /// deletion), what its destructor left applied at once.
     ///
     /// # Errors
     ///
@@ -196,11 +205,12 @@ impl Unit {
         step: &mut Step<'_>,
     ) -> GenieResult<Option<A>> {
         let by = self.releaser(step)?;
-        let top = step.world.top_speed(step.player, self)?;
-        self.clear_own_actions(actions, step, top, by)?;
+        let ai_target = step.world.ai_target(self.id);
+        self.clear_own_actions(actions, step, ai_target, by)?;
         let Some(action) = action else {
             return Ok(None);
         };
+        let top = step.world.top_speed_with(step.player, self, ai_target)?;
         let (action, torn) = admit(
             action,
             step.world.parts.motion_mut(self.id),

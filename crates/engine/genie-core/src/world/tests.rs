@@ -14530,6 +14530,49 @@ fn deleted_head_over_fly_draws_its_next_flight_time() {
     }
 }
 
+/// `FUN_140a98620` runs each destructor at its turn, so the Fly's (`FUN_140a84750`) reads the
+/// top speed (slot 0x208) the restarts before it left: the Transport's restart showed the
+/// standing sprite (the base 0.8), and the Fly gives the villager that speed as its animation
+/// speed, not the walking 1.3 the deletion started with; from the world and from the unit's
+/// step alike.
+#[test]
+fn each_destructor_reads_the_top_speed_the_restarts_before_it_left() {
+    let fly = Fly {
+        state: FlyState::Resting,
+        timer: Seconds::new(2.0),
+        home: Point::new(10.5, 10.5),
+        task: Task::default(),
+    };
+    let transport_action = TransportAction {
+        state: TransportState::Unload,
+        ..TransportAction::new(Position::new(14.0, 12.0, 0.0))
+    };
+    let list = wait_over(
+        ActionList::default()
+            .with_fly(Some(fly))
+            .with_transport(Some(transport_action)),
+    );
+    let mut world = walking_villager_holding(list.clone());
+    world
+        .clear_actions(PlayerId::new(1), ListIndex::new(2))
+        .unwrap();
+    let mut stepped = walking_villager_holding(list);
+    stepped
+        .run_on_step(
+            PlayerId::new(1),
+            ListIndex::new(2),
+            Unit::delete_own_actions,
+        )
+        .unwrap();
+    for cleared in [world, stepped] {
+        assert!(cleared.parts.actions_of(object_id(40)).list.is_empty());
+        assert_eq!(
+            villager_speeds(&cleared),
+            (Speed::new(0.8), Speed::new(0.8))
+        );
+    }
+}
+
 /// `FUN_1411e63f0` then `FUN_1411e6580` at a built building's death: each storage entry of mode
 /// 4 with an attribute and an amount above 0 leaves its owner (negated), then the population
 /// the object holds itself (attribute 4: it holds nothing after); each entry of mode 16 (a flag

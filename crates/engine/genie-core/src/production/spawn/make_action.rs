@@ -464,7 +464,8 @@ impl World {
 
     /// The production list's first action goes (`FUN_140a98e20`, and `FUN_140a98620` for the list
     /// of one the building's update makes) at the building at `list_index` of player `player_id`:
-    /// its destructor ([`World::destroy_action`]).
+    /// its destructor ([`World::destroy_action`]). The list holds one action at most (an
+    /// `Option`), so no next head restarts (slot 0x28 with 0).
     pub(crate) fn end_production_action(
         &mut self,
         player_id: PlayerId,

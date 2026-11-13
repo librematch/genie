@@ -133,8 +133,8 @@ impl Unit {
         } else {
             // any other top action's slot 0x38 is the base's false for what an animal or an
             // artifact holds (a `MoveTo` of its own), and the list goes
-            let top = step.world.top_speed(step.player, self)?;
-            self.tear_down_actions(actions, step, top, by)?;
+            let ai_target = step.world.ai_target(self.id);
+            self.tear_down_actions(actions, step, ai_target, by)?;
         }
         let trading = actions.top_action_kind() == Some(TRADE_ACTION)
             && below_or_unordered(0.0, self.life.amount.get())

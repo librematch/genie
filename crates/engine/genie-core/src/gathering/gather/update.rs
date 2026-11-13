@@ -68,7 +68,9 @@ impl GatherAction {
     }
 
     /// The teardown (`FUN_140a73fc0`) and `set_state`'s first step (`FUN_140a98620`): the
-    /// `MoveTo` goes and stops the unit (slot 0x5d0); the caller releases the targets.
+    /// `MoveTo` goes and stops the unit (slot 0x5d0); the caller releases the targets. The
+    /// sub-action list holds that `MoveTo` alone (its state's), so no next head restarts (slot
+    /// 0x28 with 0).
     ///
     /// # Errors
     ///

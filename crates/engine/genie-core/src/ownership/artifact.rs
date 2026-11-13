@@ -201,10 +201,11 @@ impl Artifact {
         self.set_target(None).released
     }
 
-    /// `FUN_140a98620` on the sub-actions (one at most): a `MoveTo` goes with its goal, whose
-    /// teardown stops a walking unit; an Enter goes with its teardown (`FUN_140a85bf0` ->
-    /// `FUN_140a73fc0`): its building or transport is let go (slot 0x180), and its own `MoveTo`,
-    /// if it walks, goes too. The stop and the release are the caller's.
+    /// `FUN_140a98620` on the sub-actions (one at most, [`ArtifactSub`], so no next head
+    /// restarts: slot 0x28 with 0): a `MoveTo` goes with its goal, whose teardown stops a walking
+    /// unit; an Enter goes with its teardown (`FUN_140a85bf0` -> `FUN_140a73fc0`): its building
+    /// or transport is let go (slot 0x180), and its own `MoveTo`, if it walks, goes too. The stop
+    /// and the release are the caller's.
     pub fn drop_sub_actions(&mut self) -> SubActionsGone {
         match self.sub.take() {
             None => SubActionsGone::default(),

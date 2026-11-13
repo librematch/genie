@@ -267,12 +267,8 @@ impl UnitView<'_, '_> {
             class: Some(own.class),
             player: self.player,
         };
-        let top = self
-            .step
-            .world
-            .top_speed_with(self.player, self.unit, ai_target)?;
         self.unit
-            .tear_down_actions(self.actions, self.step, top, by)?;
+            .tear_down_actions(self.actions, self.step, ai_target, by)?;
         self.step.lend_at(
             (&mut *self.unit, &mut *self.actions),
             |world, player_id, list_index| {
