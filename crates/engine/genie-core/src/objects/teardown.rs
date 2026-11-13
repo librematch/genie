@@ -2,6 +2,7 @@
 //! they leave (slot 0x28 with 0), its add after the install (slot 0x808, `FUN_14106e990`) and
 //! each action's destructor (its slot 0): what they leave the unit's world to apply.
 
+use crate::GenieResult;
 use crate::combat::missile::ShooterId;
 use crate::construction::FoundationId;
 use crate::garrison::ContainerId;
@@ -20,7 +21,6 @@ use crate::objects::unit::Unit;
 use crate::world::lets::torn_down;
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
-use crate::{GenieError, GenieResult};
 
 /// What an action's destructor leaves its unit's world: the targets it lets go (slot 0x180),
 /// in order, and the buildings a counted builder or repairer leaves (`FUN_140aaddb0`).
@@ -233,9 +233,6 @@ pub(crate) enum HeadStart {
     Restarted,
 }
 
-/// The head's slot 0x28 with 0 of a kind whose restart is not ported yet ([`Unit::restart_head`]).
-pub(crate) const NEXT_HEAD: &str = "a deleted head with a second action under it (slot 0x28)";
-
 impl ActionList {
     /// The list's part of `FUN_140a98e20`: the head goes and its destructor runs
     /// ([`Action::tear_down`] on the unit's motion layer and top speed); then, with another action
@@ -316,16 +313,19 @@ impl Unit {
     /// (`0x140a8b3a0`) takes it, then walks off a farm that others work too or searches
     /// ([`Unit::restart_gather`]). A unit's own Attack (`0x140a7f8c0`) fails without a unit AI
     /// or inside an object, else starts again as the list's add starts it but for the attack
-    /// count's clear ([`Unit::restart_attack`]). Nothing for an empty list.
+    /// count's clear ([`Unit::restart_attack`]). The Build's (`0x140aadd80`,
+    /// [`Unit::restart_build`]), the Repair's (`FUN_140ad9030`, [`Unit::restart_repair`]) and the
+    /// Fly's (`0x140a84900`, [`Fly::restart`]) take `set_state(3)` with 0. Nothing for an empty
+    /// list.
     ///
     /// [`MakeAction::first`]: crate::gathering::make::MakeAction::first
     /// [`MissileAction::restart`]: crate::combat::missile::MissileAction::restart
+    /// [`Fly::restart`]: crate::movement::fly::Fly::restart
     ///
     /// # Errors
     ///
-    /// An owner the world lacks, the Explore's, the Transport's, the `MoveTo`'s, the Enter's,
-    /// the Hunt's, the Gather's and the Attack's, and the restart of any other kind, which is not
-    /// ported.
+    /// An owner the world lacks, and the Explore's, the Transport's, the `MoveTo`'s, the Enter's,
+    /// the Hunt's, the Gather's, the Attack's, the Build's, the Repair's and the Fly's.
     pub(crate) fn restart_head(
         &mut self,
         actions: &mut LayersAction,
@@ -355,7 +355,9 @@ impl Unit {
             Some(&mut Action::Hunt(hunt)) => self.hunt_begin_search(hunt, actions, step),
             Some(&mut Action::Gather(gather)) => self.restart_gather(gather, actions, step),
             Some(&mut Action::Attack(attack)) => self.restart_attack(attack, actions, step),
-            Some(head) => Err(GenieError::unreachable(NEXT_HEAD).with("kind", head.kind())),
+            Some(Action::Build(build_action)) => self.restart_build(build_action, step),
+            Some(Action::Repair(repair_action)) => self.restart_repair(repair_action, step),
+            Some(Action::Fly(fly)) => fly.restart(self, step),
         }
     }
 }

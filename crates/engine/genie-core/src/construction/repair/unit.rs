@@ -5,6 +5,7 @@ use crate::combat::damage::TransformTest;
 use crate::combat::damage::heal_base_hp;
 use crate::construction::MainBuildingId;
 use crate::construction::RepairTargetId;
+use crate::construction::repair::RepairAction;
 use crate::construction::repair::RepairFrom;
 use crate::construction::repair::RepairOutcome;
 use crate::construction::repair::payment::PaidAttributes;
@@ -79,6 +80,23 @@ impl Unit {
         // its end's 1 deletes it; the destructor (FUN_140ad8fd0) finds it out of the repairers
         // (set_state left them) and lets the target it still holds go
         repaired
+    }
+
+    /// The Repair's slot 0x28 with 0 (`FUN_140ad9030`), as the action list's deletion restarts it
+    /// at the head (`FUN_140a98e20`): `set_state(3)` ([`RepairAction::idle`]) with what the
+    /// Repair reads where the unit stands ([`Unit::repair_reads`]: the object its repairers count
+    /// in).
+    ///
+    /// # Errors
+    ///
+    /// [`Unit::repair_reads`]' and [`RepairAction::idle`]'s.
+    pub(crate) fn restart_repair(
+        &mut self,
+        repair_action: &mut RepairAction,
+        step: &mut Step<'_>,
+    ) -> GenieResult<()> {
+        let reads = self.repair_reads(step, repair_action.target, &step.world.model.roles)?;
+        repair_action.idle(step, self, &reads)
     }
 
     /// What the Repair's update reads as it starts ([`RepairReads`]): its `target` and the

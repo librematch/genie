@@ -14,6 +14,13 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::step::Step;
 
+/// `set_state(3)`'s case (`0x140ad9c60`): the repairer's unit AI hears notify 0x202 with the
+/// repair's action value, then the repairer shows its master's standing sprite.
+pub(super) fn wait_for_work(step: &mut Step<'_>, repairer: &mut Unit) -> GenieResult<()> {
+    notify(step, repairer, NotifyKind::REQUIRES_SEARCH)?;
+    standing(step, repairer)
+}
+
 impl RepairAction {
     /// [`RepairAction::set_state`]'s part by the new state (`0x140ad9c60`'s switch).
     pub(super) fn enter(
@@ -26,10 +33,7 @@ impl RepairAction {
         match self.state {
             RepairState::Done => self.enter_done(step, repairer, reads)?,
             RepairState::Halted => standing(step, repairer)?,
-            RepairState::Idle => {
-                notify(step, repairer, NotifyKind::REQUIRES_SEARCH)?;
-                standing(step, repairer)?;
-            }
+            RepairState::Idle => wait_for_work(step, repairer)?,
             RepairState::Move { .. } => self.enter_walk(step, repairer, reads, roles)?,
             RepairState::Face => {
                 if let Some(repairee) = reads.target {

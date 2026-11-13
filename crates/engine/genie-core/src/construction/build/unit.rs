@@ -1,7 +1,8 @@
 //! The builder's part of its update: what the Build action reads as it starts (its
 //! foundation, the builder and its unit AI's orders), the action's update on the Build copied
 //! out of the action list, and the work, which runs on the world with the builder lent: the
-//! foundation's work, its starts and its completion.
+//! foundation's work, its starts and its completion. The deletion's restart of the Build (slot
+//! 0x28 with 0) reads its foundation and its unit AI's orders here too.
 
 use crate::construction::BuildProgress;
 use crate::construction::build::BuildState;
@@ -23,6 +24,7 @@ use crate::gathering::hunt::DropOff;
 use crate::map::spatial::Spatial;
 use crate::movement::{Me, footprint_gap_squared};
 use crate::objects::layers::Action;
+use crate::objects::layers::Building;
 use crate::objects::lifecycle::death_parts::clear_look_of;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::teardown::HeadCode;
@@ -36,6 +38,7 @@ use crate::unit_ai::task_finder::world::state_of;
 use crate::world::World;
 use crate::world::layer::MasterRoles;
 use crate::world::others::OthersRef;
+use crate::world::parts::PartTable;
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
@@ -124,27 +127,11 @@ impl Unit {
         let others = OthersRef::of(&step.world.players, &step.world.index, step.player)?;
         let target = action.target;
         let foundation = others.own(target);
-        let site = foundation
-            .filter(|unit| step.world.parts.building_of(unit.id).construction.is_some())
-            .map(|unit| FoundationId::new(unit.id));
+        let site = construction_site(&step.world.parts.building, foundation);
         let built = foundation.map(|unit| unit.life.master_id);
         let stack_made =
             foundation.and_then(|unit| step.world.parts.building_of(unit.id).stack_made);
-        let build_targets: Vec<(Option<ObjectId>, Option<ObjectState>)> = step
-            .world
-            .parts
-            .unit_ai
-            .get(self.id)
-            .map_or_else(Vec::new, |ai| {
-                ai.orders
-                    .iter()
-                    .filter(|queued_order| queued_order.order == OrderKind::Build)
-                    .map(|queued_order| {
-                        let state = others.own(queued_order.target).map(|unit| unit.life.state);
-                        (queued_order.target, state)
-                    })
-                    .collect()
-            });
+        let build_targets = build_order_states(step.world.parts.unit_ai.get(self.id), others);
         let (deposit, gone_orders) = if matches!(action.state, BuildState::Drop { .. }) {
             (
                 self.build_deposit(step, others, action.site)?,
@@ -169,6 +156,24 @@ impl Unit {
             drop_site: drop_site_master(step, built)? && has_kind,
             by: self.releaser(step)?,
         })
+    }
+
+    /// The Build's slot 0x28 with 0 (`0x140aadd80`), as the action list's deletion restarts it
+    /// at the head (`FUN_140a98e20`): `set_state(3)` ([`BuildAction::idle`]) on its foundation
+    /// and its unit AI's build orders as the player holds them now.
+    ///
+    /// # Errors
+    ///
+    /// A player the world lacks, and [`BuildAction::idle`]'s.
+    pub(crate) fn restart_build(
+        &mut self,
+        build_action: &mut BuildAction,
+        step: &mut Step<'_>,
+    ) -> GenieResult<()> {
+        let others = OthersRef::of(&step.world.players, &step.world.index, step.player)?;
+        let site = construction_site(&step.world.parts.building, others.own(build_action.target));
+        let build_targets = build_order_states(step.world.parts.unit_ai.get(self.id), others);
+        build_action.idle(step, self, site, &build_targets)
     }
 
     /// State 8: what the drop-off reads of its drop site `site`: its state, whether it takes
@@ -237,6 +242,36 @@ impl Unit {
                 .collect()
         })
     }
+}
+
+/// The foundation `foundation` as the Build works it ([`BuildReads::site`]): an object with its
+/// construction in `buildings`, none else.
+fn construction_site(
+    buildings: &PartTable<Building>,
+    foundation: Option<&Unit>,
+) -> Option<FoundationId> {
+    foundation
+        .filter(|unit| buildings.of(unit.id).construction.is_some())
+        .map(|unit| FoundationId::new(unit.id))
+}
+
+/// The foundation and its state of each build order queued in the unit AI `ai`
+/// ([`BuildReads::build_targets`]), as the owner holds it (`others`): None for one it does not
+/// hold.
+fn build_order_states(
+    ai: Option<&UnitAi>,
+    others: OthersRef<'_>,
+) -> Vec<(Option<ObjectId>, Option<ObjectState>)> {
+    ai.map_or_else(Vec::new, |ai| {
+        ai.orders
+            .iter()
+            .filter(|queued_order| queued_order.order == OrderKind::Build)
+            .map(|queued_order| {
+                let state = others.own(queued_order.target).map(|unit| unit.life.state);
+                (queued_order.target, state)
+            })
+            .collect()
+    })
 }
 
 impl BuildAction {

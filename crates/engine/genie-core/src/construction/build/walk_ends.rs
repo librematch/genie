@@ -42,7 +42,7 @@ impl BuildAction {
             return self.restart(step, builder, roles);
         }
         if self.target.is_none() {
-            return self.idle(step, builder, reads);
+            return self.idle(step, builder, reads.site, &reads.build_targets);
         }
         if !roles
             .of_some_class(reads.class)
@@ -99,7 +99,7 @@ impl BuildAction {
         roles: &Roles,
     ) -> GenieResult<()> {
         if let Some(target) = self.target {
-            let unit = Self::site_unit(step, reads)?.ok_or(FOREIGN_SITE)?;
+            let unit = Self::site_unit(step, reads.site)?.ok_or(FOREIGN_SITE)?;
             let desolid = step
                 .world
                 .parts
@@ -137,7 +137,7 @@ impl BuildAction {
             .spatial
             .get_known(self.target)
             .map(Option::<&_>::copied);
-        let master_radius = match Self::site_unit(step, reads)? {
+        let master_radius = match Self::site_unit(step, reads.site)? {
             Some(unit) => Some(
                 unit.master(step.world.master_tables(), step.player)?
                     .radius
@@ -173,7 +173,7 @@ impl BuildAction {
         if found.reaches() {
             self.restart(step, builder, roles)
         } else {
-            self.idle(step, builder, reads)
+            self.idle(step, builder, reads.site, &reads.build_targets)
         }
     }
 

@@ -193,6 +193,19 @@ impl Fly {
         }
     }
 
+    /// Slot 0x28 with 0 (`0x140a84900`), as the action list's deletion restarts the Fly at the
+    /// head (`FUN_140a98e20`): only `set_state(3)` ([`Fly::set_state`] through
+    /// [`Fly::set_state_of`]): its `MoveTo` goes and stops `bird`, and the flight's time is drawn
+    /// from the Action stream. The first's own tests (the player's bird, the fly mode) run only
+    /// with 1 ([`Unit::start_fly`]).
+    ///
+    /// # Errors
+    ///
+    /// What the stop does not model.
+    pub(crate) fn restart(&mut self, bird: &Unit, step: &mut Step<'_>) -> GenieResult<()> {
+        self.set_state_of(bird, FlyState::Choosing, step)
+    }
+
     /// [`Fly::set_state`] of `bird`'s Fly with the step's Action stream; a dropped `MoveTo` stops
     /// the bird at once ([`stop_if`]).
     fn set_state_of(

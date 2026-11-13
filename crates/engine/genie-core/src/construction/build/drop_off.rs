@@ -346,7 +346,7 @@ impl BuildAction {
                 self.end(step, builder, BuildState::Done)?;
                 return Ok(HeadCode::Deletes);
             }
-            self.idle(step, builder, reads)?;
+            self.idle(step, builder, reads.site, &reads.build_targets)?;
             return Ok(HeadCode::Keeps);
         }
         // UCOMISS against −1 (DAT_14330ec20): a NaN is not

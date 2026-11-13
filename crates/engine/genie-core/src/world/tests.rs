@@ -39,6 +39,7 @@ use crate::construction::build::{BUILDER_UNMOVING, CART_TASK};
 use crate::construction::build::{BuildAction, BuildTask, Construction};
 use crate::construction::repair::RepairState;
 use crate::construction::repair::{BUILDING_REPAIR_COST, REPAIR};
+use crate::construction::repair::{RepairAction, RepairTask};
 use crate::construction::wait_solidify::{WAIT_SOLIDIFY, WaitSolidify};
 use crate::construction::{Annexes, BuilderCount, RepairTargetId};
 use crate::garrison::ContainerId;
@@ -183,7 +184,7 @@ use crate::objects::object_list::ObjectList;
 use crate::objects::release::{Releaser, released};
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::sprite::Graphic;
-use crate::objects::teardown::{NEXT_HEAD, NextHead};
+use crate::objects::teardown::NextHead;
 use crate::objects::unit::Presence;
 use crate::objects::unit::UnitFlags;
 use crate::objects::unit::{Outcome, TAKEN_OUT};
@@ -193,6 +194,7 @@ use crate::orders::ControlKey;
 use crate::orders::Dispatch;
 use crate::orders::OrderFlags;
 use crate::orders::SavedPatrols;
+use crate::orders::object_gone;
 use crate::orders::town_bell::BackToWork;
 use crate::orders::{Interact, MoveOrder, Sweep, Work};
 use crate::ownership::CaptureKind;
@@ -13801,26 +13803,24 @@ fn clearing_three_actions_restarts_the_second_and_the_third() {
     }
 }
 
-/// Each restart comes after the teardown before it let go, and before the next deletion: a
-/// bird's Fly, whose restart is not ported, stops the deletion at the head after the walk let
-/// town centre 9149 go (and, with a Make between them, after the Make restarted), untouched; from
-/// the world and from the unit's step alike.
+/// Each restart comes after the teardown before it let go, and before the next deletion: an
+/// Enter of an object the world does not hold fails its restart, which stops the deletion at the
+/// head after the walk let town centre 9149 go (and, with a Make between them, after the Make
+/// restarted), untouched; from the world and from the unit's step alike.
 #[test]
 fn each_restart_follows_the_teardown_before_it() {
-    let resting = Fly {
-        state: FlyState::Resting,
-        timer: Seconds::new(2.0),
-        home: Point::new(10.5, 10.5),
-        task: Task::default(),
-    };
-    let fly = ActionList::default().with_fly(Some(resting));
+    let enter = ActionList::default().with_enter(Some(EnterAction {
+        target: Some(ContainerId::new(object_id(99))),
+        ..enter_town_centre()
+    }));
     for (list, holding) in [
         (
-            fly.clone().with_move_to(Some(walk_to_town_centre())),
+            enter.clone().with_move_to(Some(walk_to_town_centre())),
             (Some(attribute::FOOD), Amount::new(15.0)),
         ),
         (
-            fly.clone()
+            enter
+                .clone()
                 .with_make(Some(made_farm_food()))
                 .with_move_to(Some(walk_to_town_centre())),
             (Some(attribute::FARM_FOOD), Amount::ZERO),
@@ -13839,8 +13839,8 @@ fn each_restart_follows_the_teardown_before_it() {
             )
             .unwrap_err();
         for (stopped, error) in [(world, error), (stepped, step_error)] {
-            assert_eq!(error.reason(), NEXT_HEAD);
-            assert_eq!(stopped.parts.actions_of(object_id(40)).list, fly);
+            assert_eq!(error.reason(), object_gone(object_id(99)).reason());
+            assert_eq!(stopped.parts.actions_of(object_id(40)).list, enter);
             assert_eq!(
                 town_workers_and_holding(&stopped),
                 (0, 1, holding.0, holding.1)
@@ -14248,6 +14248,239 @@ fn deleted_head_over_own_move_to_lets_its_removed_target_go_at_once() {
         villager_speeds(&world),
         (Speed::new(0.8 * 1.25), Speed::new(1.0))
     );
+}
+
+/// A Build in `state` of foundation 10028, which the builder's player does not hold (no site
+/// for the Build to read), counted among its builders when `added`.
+fn build_of_foreign_foundation(state: BuildState, added: bool) -> BuildAction {
+    BuildAction {
+        target: Some(FoundationId::new(object_id(10028))),
+        state,
+        point: Position::new(30.0, 30.0, 0.0),
+        task: BuildTask {
+            range: Distance::ZERO,
+            work_value: WorkValue::new(0.0),
+            work_rate: WorkRate::new(1.0),
+            resource: None,
+            id: TaskId::of_task(-1),
+            key: task_key(ActionKind::BUILD),
+            sprites: TaskSprites::NONE,
+        },
+        added,
+        timer: Seconds::ZERO,
+        site: None,
+    }
+}
+
+/// The builders of foundation 10028.
+fn foundation_builders(world: &World) -> Option<u8> {
+    world
+        .parts
+        .building_of(object_id(10028))
+        .construction
+        .map(|construction| construction.builders.get())
+}
+
+/// A build order on `target`.
+fn build_order(target: i32) -> QueuedOrder {
+    QueuedOrder {
+        order: OrderKind::Build,
+        target: Some(object_id(target)),
+        ..QueuedOrder::default()
+    }
+}
+
+/// A deleted head over a Build restarts it with 0 (`0x140aadd80`): `set_state(3)`
+/// (`0x140aae200` case 3). A counted builder leaves its foundation's builders and a `MoveTo` it
+/// walked goes and stops the unit; its build order on a foundation the player does not hold
+/// leaves the queue (`FUN_140c5dcd0`), and with no order left its unit AI hears 0x202 with the
+/// build's action value and the unit shows its standing sprite (its top speed back to the base).
+#[test]
+fn deleted_head_over_build_without_orders_left_waits_for_work() {
+    let walking = MoveToAction::sub_to_point(Position::new(3.0, 4.0, 0.0), Distance::ZERO, None);
+    for (state, added, stopped, builders) in [
+        (
+            BuildState::Move {
+                move_to: Some(walking),
+            },
+            false,
+            Speed::ZERO,
+            1,
+        ),
+        (BuildState::Work, true, Speed::new(1.0), 0),
+    ] {
+        let mut world = walking_villager_holding(wait_over(
+            ActionList::default().with_build(Some(build_of_foreign_foundation(state, added))),
+        ));
+        world.parts.unit_ai.get_mut(object_id(40)).unwrap().orders = vec![build_order(10028)];
+        delete_villager_head(&mut world).unwrap();
+        assert_eq!(
+            world
+                .parts
+                .actions_of(object_id(40))
+                .list
+                .build()
+                .map(|build_action| (build_action.state, build_action.added)),
+            Some((BuildState::Idle, false)),
+            "{state:?}"
+        );
+        assert_eq!(
+            villager_heard(&world),
+            [(NotifyKind::REQUIRES_SEARCH, [AiAction::Build.value(), 0, 0])]
+        );
+        assert_eq!(
+            world.parts.unit_ai.get(object_id(40)).unwrap().orders,
+            Vec::new()
+        );
+        assert_eq!(
+            villager_speeds(&world),
+            (Speed::new(0.8), stopped),
+            "{state:?}"
+        );
+        assert_eq!(foundation_builders(&world), Some(builders), "{state:?}");
+    }
+}
+
+/// A deleted head over a Build whose unit AI keeps an order (`FUN_140c564a0` above 0: a build
+/// order on town centre 9150, a foundation of the builder's player) ends it: no order and no
+/// action (`FUN_140c64b60`, `FUN_140c64b50`), then `set_state(1)`: its unit AI hears nothing and
+/// the unit shows its standing sprite; the build order on the foundation it does not hold goes.
+#[test]
+fn deleted_head_over_build_with_an_order_left_ends_it() {
+    let mut world = walking_villager_holding(wait_over(
+        ActionList::default().with_build(Some(build_of_foreign_foundation(BuildState::Work, true))),
+    ));
+    world.players[1].objects[ListIndex::new(4)].life.state = ObjectState::Foundation;
+    let ai = world.parts.unit_ai.get_mut(object_id(40)).unwrap();
+    ai.orders = vec![build_order(10028), build_order(9150)];
+    (ai.current_order, ai.current_action) = (Some(OrderKind::Build), Some(AiAction::Build));
+    delete_villager_head(&mut world).unwrap();
+    assert_eq!(
+        world
+            .parts
+            .actions_of(object_id(40))
+            .list
+            .build()
+            .map(|build_action| (build_action.state, build_action.added)),
+        Some((BuildState::Done, false))
+    );
+    let ai = world.parts.unit_ai.get(object_id(40)).unwrap();
+    assert_eq!(ai.orders, [build_order(9150)]);
+    assert_eq!(
+        (ai.current_order, ai.current_action, ai.last_action),
+        (None, None, Some(AiAction::Build))
+    );
+    assert_eq!(villager_heard(&world), Vec::new());
+    assert_eq!(villager_speeds(&world), (Speed::new(0.8), Speed::new(1.0)));
+    assert_eq!(foundation_builders(&world), Some(0));
+}
+
+/// A deleted head over a Repair of town centre 9149 restarts it with 0 (`FUN_140ad9030`):
+/// `set_state(3)` (`0x140ad9c60` case 3). A counted Repair leaves the town centre's repairers
+/// and a `MoveTo` it walked goes and stops the unit; its unit AI hears 0x202 with the repair's
+/// action value and the unit shows its standing sprite; its target and its point stay.
+#[test]
+fn deleted_head_over_repair_waits_for_work() {
+    let walking = MoveToAction::sub_to_point(Position::new(3.0, 4.0, 0.0), Distance::ZERO, None);
+    for (state, counted, stopped, repairers) in [
+        (
+            RepairState::Move {
+                move_to: Some(walking),
+            },
+            false,
+            Speed::ZERO,
+            1,
+        ),
+        (RepairState::Work, true, Speed::new(1.0), 0),
+    ] {
+        let repair_action = RepairAction {
+            target: Some(RepairTargetId::new(object_id(9149))),
+            state,
+            point: Position::new(20.0, 20.0, 0.0),
+            timer: Seconds::ZERO,
+            task: RepairTask::of(&Task::default()),
+            range: Distance::ZERO,
+            counted,
+            voice: Voice::Loud,
+        };
+        let mut world = walking_villager_holding(wait_over(
+            ActionList::default().with_repair(Some(repair_action)),
+        ));
+        *world.parts.repairers_mut(object_id(9149)).unwrap() = BuilderCount::of_data(1);
+        delete_villager_head(&mut world).unwrap();
+        assert_eq!(
+            world.parts.actions_of(object_id(40)).list.repair().copied(),
+            Some(RepairAction {
+                state: RepairState::Idle,
+                counted: false,
+                ..repair_action
+            }),
+            "{state:?}"
+        );
+        assert_eq!(
+            villager_heard(&world),
+            [(
+                NotifyKind::REQUIRES_SEARCH,
+                [AiAction::Repair.value(), 0, 0]
+            )]
+        );
+        assert_eq!(
+            villager_speeds(&world),
+            (Speed::new(0.8), stopped),
+            "{state:?}"
+        );
+        assert_eq!(
+            world.parts.repairers_of(object_id(9149)).get(),
+            repairers,
+            "{state:?}"
+        );
+    }
+}
+
+/// A deleted head over a Fly restarts it with 0 (`0x140a84900`): only `set_state(3)`
+/// (`0x140a84a50`): a `MoveTo` it flew goes and stops the unit (one resting leaves it moving),
+/// and the flight's time is drawn once from the Action stream; its sprite and its unit AI are
+/// left alone.
+#[test]
+fn deleted_head_over_fly_draws_its_next_flight_time() {
+    let flight = MoveToAction::sub_to_point(Position::new(3.0, 4.0, 0.0), Distance::ZERO, None);
+    for (state, stopped) in [
+        (
+            FlyState::Flying {
+                move_to: Some(flight),
+            },
+            Speed::ZERO,
+        ),
+        (FlyState::Resting, Speed::new(1.0)),
+    ] {
+        let fly = Fly {
+            state,
+            timer: Seconds::new(2.0),
+            home: Point::new(10.5, 10.5),
+            task: Task::default(),
+        };
+        let mut world =
+            walking_villager_holding(wait_over(ActionList::default().with_fly(Some(fly))));
+        let mut action = world.streams.get_mut(Stream::Action).clone();
+        delete_villager_head(&mut world).unwrap();
+        let time = ((action.rand15() as i32 * 10) / 0x7fff + 5) as f32;
+        assert_eq!(
+            world.parts.actions_of(object_id(40)).list.fly().copied(),
+            Some(Fly {
+                state: FlyState::Choosing,
+                timer: Seconds::new(time),
+                ..fly
+            }),
+            "{state:?}"
+        );
+        assert_eq!(*world.streams.get_mut(Stream::Action), action);
+        assert_eq!(
+            villager_speeds(&world),
+            (Speed::new(1.3), stopped),
+            "{state:?}"
+        );
+        assert_eq!(villager_heard(&world), Vec::new());
+    }
 }
 
 /// `FUN_1411e63f0` then `FUN_1411e6580` at a built building's death: each storage entry of mode

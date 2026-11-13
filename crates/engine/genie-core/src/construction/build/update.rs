@@ -106,7 +106,7 @@ impl BuildAction {
             return Ok(HeadCode::Keeps);
         }
         if self.lost_foundation(step, reads) {
-            self.idle(step, builder, reads)?;
+            self.idle(step, builder, reads.site, &reads.build_targets)?;
             return Ok(HeadCode::Keeps);
         }
         // the second target's id names no object of the world: FUN_140a7a190 with none, whose
@@ -159,7 +159,7 @@ impl BuildAction {
         reads: &BuildReads,
     ) -> GenieResult<bool> {
         let player_kind = step.world.players.player(step.player)?.kind;
-        let site = Self::site_unit(step, reads)?;
+        let site = Self::site_unit(step, reads.site)?;
         let pasture = match site {
             Some(unit) => step
                 .world
@@ -218,7 +218,7 @@ impl BuildAction {
         reads: &BuildReads,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let Some(site) = Self::site_unit(step, reads)? else {
+        let Some(site) = Self::site_unit(step, reads.site)? else {
             return Ok(());
         };
         let state = site.life.state;
@@ -333,7 +333,7 @@ impl BuildAction {
     ) -> GenieResult<()> {
         match self.step_walk(step, builder, me, reads, roles)? {
             SubCode::Done | SubCode::Failed | SubCode::TargetGone => {
-                self.idle(step, builder, reads)
+                self.idle(step, builder, reads.site, &reads.build_targets)
             }
             SubCode::UnderWay => Ok(()),
         }

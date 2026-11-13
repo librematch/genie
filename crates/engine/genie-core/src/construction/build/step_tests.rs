@@ -1454,7 +1454,7 @@ fn idle_build_with_orders_left_is_done() {
         world.parts.unit_ai.get_mut(BUILDER).unwrap().orders = vec![hunt_order()];
         on_patrol_timers(&mut world, BUILDER, order, adjusted);
         on_build(&mut world, |build_action, step, unit, reads| {
-            build_action.idle(step, unit, reads)
+            build_action.idle(step, unit, reads.site, &reads.build_targets)
         })
         .unwrap();
         assert_eq!(build(&world).state.bare(), BuildState::Done);

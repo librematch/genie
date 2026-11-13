@@ -68,7 +68,7 @@ impl BuildAction {
         let desolid = step
             .world
             .parts
-            .building_of(Self::site_unit(step, reads)?.ok_or(FOREIGN_SITE)?.id)
+            .building_of(Self::site_unit(step, reads.site)?.ok_or(FOREIGN_SITE)?.id)
             .construction
             .is_some_and(|construction| construction.desolid);
         // every set_state first takes the builder out of FUN_140aaddb0's building's builders
@@ -366,7 +366,7 @@ impl BuildAction {
         actions: &mut Action,
         reads: &BuildReads,
     ) -> GenieResult<()> {
-        let site = Self::site_unit(step, reads)?.ok_or(FOREIGN_SITE)?;
+        let site = Self::site_unit(step, reads.site)?.ok_or(FOREIGN_SITE)?;
         let mut rate = self.task.work_rate * self.task.work_value * step.dt.seconds();
         let mut factor = step
             .world
@@ -397,7 +397,7 @@ impl BuildAction {
         }
         // a finished foundation with hit points ends the work (its `+0x278`, decoded); one
         // without (deleted, it dies in its own update) leaves the Build as it is
-        if Self::site_unit(step, reads)?.is_some_and(|unit| HitPoints::ZERO < unit.life.hp) {
+        if Self::site_unit(step, reads.site)?.is_some_and(|unit| HitPoints::ZERO < unit.life.hp) {
             self.finish(step, builder, reads)?;
         }
         Ok(())

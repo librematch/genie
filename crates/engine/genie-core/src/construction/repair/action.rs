@@ -6,6 +6,7 @@ use crate::combat::attack::face_target;
 use crate::combat::damage::ArmorPair;
 use crate::construction::repair::RepairOutcome;
 use crate::construction::repair::RepairState;
+use crate::construction::repair::action::enter::wait_for_work;
 use crate::construction::repair::repair_target;
 use crate::construction::repair::{ONE, RepairAction, RepairReads, RepairTask, Repairee};
 use crate::construction::{BuilderCount, RepairTargetId};
@@ -551,7 +552,8 @@ impl RepairAction {
     }
 
     /// `set_state` (`0x140ad9c60`): a counted action leaves its target's repairers, the
-    /// sub-actions go (a walking `MoveTo`'s teardown stops the unit), then by the new state: 1
+    /// sub-actions go (a walking `MoveTo`'s teardown stops the unit: [`RepairAction::leave`]),
+    /// then by the new state: 1
     /// lets the target go (slot 0x68 with none) and posts notify 0x1fa unless quiet; 1, 2 and 3
     /// (with notify 0x202) give the unit its standing sprite; 4 takes the target's place and a
     /// `MoveTo` to the target; 6 takes its place and shows the task's moving sprite; 7 shows its
@@ -567,6 +569,42 @@ impl RepairAction {
         reads: &RepairReads,
         roles: &Roles,
     ) -> GenieResult<()> {
+        self.leave(step, repairer, reads)?;
+        self.state = state.bare();
+        self.enter(step, repairer, reads, roles)
+    }
+
+    /// `set_state(3)` ([`RepairAction::set_state`] with 3, whose case reads none of the build
+    /// layer's roles): the prelude ([`RepairAction::leave`]), then its unit AI hears notify 0x202
+    /// and the repairer shows its standing sprite. Its target stays.
+    ///
+    /// # Errors
+    ///
+    /// The unit's stop that the motion step does not model, and a sprite the table lacks.
+    pub(super) fn idle(
+        &mut self,
+        step: &mut Step<'_>,
+        repairer: &mut Unit,
+        reads: &RepairReads,
+    ) -> GenieResult<()> {
+        self.leave(step, repairer, reads)?;
+        self.state = RepairState::Idle;
+        wait_for_work(step, repairer)
+    }
+
+    /// The prelude of every `set_state` (`0x140ad9c60`): a counted action leaves its target's
+    /// repairers (`FUN_140ad9050`'s object, [`RepairReads::counted_in`]), then the sub-actions go
+    /// (`FUN_140a98620`: a walking `MoveTo`'s teardown stops the unit, slot 0x5d0).
+    ///
+    /// # Errors
+    ///
+    /// The unit's stop that the motion step does not model.
+    fn leave(
+        &mut self,
+        step: &mut Step<'_>,
+        repairer: &Unit,
+        reads: &RepairReads,
+    ) -> GenieResult<()> {
         if self.counted {
             Self::count(step, reads, -1)?;
             self.counted = false;
@@ -576,8 +614,7 @@ impl RepairAction {
         {
             mover.stop()?;
         }
-        self.state = state.bare();
-        self.enter(step, repairer, reads, roles)
+        Ok(())
     }
 
     /// `set_state(4)` from the work command's new target `to` (slot 0x48, the caller's

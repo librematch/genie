@@ -8,6 +8,8 @@ use crate::gathering::DropSiteId;
 use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::movement::move_to::MoveToAction;
+use crate::objects::ObjectId;
+use crate::objects::ObjectState;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::PlayersMastersExt;
 use crate::objects::teardown::HeadCode;
@@ -34,16 +36,14 @@ use crate::world::step::Step;
 use std::mem::replace;
 
 impl BuildAction {
-    /// The foundation as the update reads it ([`BuildReads::site`]): the builder's player's
-    /// object, None once the player no longer holds it.
+    /// The foundation `site` as the update reads it ([`BuildReads::site`]): the builder's
+    /// player's object, None once the player no longer holds it.
     pub(super) fn site_unit<'world>(
         step: &'world Step<'_>,
-        reads: &BuildReads,
+        site: Option<FoundationId>,
     ) -> GenieResult<Option<&'world Unit>> {
         let _ = step.world.players.player(step.player)?;
-        Ok(reads
-            .site
-            .and_then(|id| step.world.live_object(step.player, id)))
+        Ok(site.and_then(|id| step.world.live_object(step.player, id)))
     }
 
     /// The builder count (`+0x9e8`) of the building `FUN_140aaddb0` gives a Build on `site`
@@ -190,7 +190,7 @@ impl BuildAction {
                 "a computer player's builder after its work",
             ));
         }
-        let site = Self::site_unit(step, reads)?.ok_or(GenieError::unsupported(
+        let site = Self::site_unit(step, reads.site)?.ok_or(GenieError::unsupported(
             "the end of a Build on a foundation the slice does not read",
         ))?;
         let master = site.master(step.world.master_tables(), step.player)?;
@@ -355,13 +355,14 @@ impl BuildAction {
 }
 
 impl BuildAction {
-    /// `set_state(3)` (`0x140aae200` case 3): the prelude (out of the foundation's builders, the
-    /// `MoveTo`'s teardown), then with a unit AI its build orders on foundations gone or no
-    /// longer in state 0 leave its queue (`FUN_140c5dcd0`, the foundation's state as it is now);
-    /// with orders left (`FUN_140c564a0`) it has no order and no action (`FUN_140c64b60`,
-    /// `FUN_140c64b50` with −1) and the Build ends (`set_state(1)`: the update after removes
-    /// it); with none it posts notify 0x202 to its unit AI and takes its standing sprite (slot
-    /// 0x68).
+    /// `set_state(3)` (`0x140aae200` case 3) on its foundation `site` ([`BuildReads::site`]):
+    /// the prelude (out of the foundation's builders, the `MoveTo`'s teardown), then with a unit
+    /// AI its build orders on foundations gone or no longer in state 0 leave its queue
+    /// (`FUN_140c5dcd0`: `site`'s state as it is now, the others' in `build_targets`,
+    /// [`BuildReads::build_targets`]); with orders left (`FUN_140c564a0`) it has no order and no
+    /// action (`FUN_140c64b60`, `FUN_140c64b50` with −1) and the Build ends (`set_state(1)`: the
+    /// update after removes it); with none it posts notify 0x202 to its unit AI and takes its
+    /// standing sprite (slot 0x68).
     ///
     /// # Errors
     ///
@@ -370,14 +371,15 @@ impl BuildAction {
         &mut self,
         step: &mut Step<'_>,
         builder: &mut Unit,
-        reads: &BuildReads,
+        site: Option<FoundationId>,
+        build_targets: &[(Option<ObjectId>, Option<ObjectState>)],
     ) -> GenieResult<()> {
-        let built = Self::site_unit(step, reads)?.map(|unit| (unit.id, unit.life.state));
+        let built = Self::site_unit(step, site)?.map(|unit| (unit.id, unit.life.state));
         self.leave(step, builder)?;
         self.state = BuildState::Idle;
         let mut left = 0;
         if let Some(ai) = step.world.parts.unit_ai.get_mut(builder.id) {
-            drop_done_orders(ai, built, &reads.build_targets);
+            drop_done_orders(ai, built, build_targets);
             left = ai.orders.len();
             if left != 0 {
                 ai.end_order_and_action(step.world.streams.get_mut(Stream::Ai));
