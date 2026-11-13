@@ -233,7 +233,7 @@ impl RepairAction {
                 || step.world.model.tuning.repair.least_hp > repairee.hp.get()
                 || (!repairee.allied && repairee.owner != PlayerId::GAIA))
         {
-            self.drop_target(step, repairer, reads)?;
+            self.drop_target(step, repairer, reads.counted_object())?;
             self.set_state(step, repairer, RepairState::Done, reads, roles)?;
             return Ok(HeadCode::Keeps);
         }
@@ -350,7 +350,7 @@ impl RepairAction {
         match self.step_walk(step, repairer, me, reads)? {
             SubCode::UnderWay => return Ok(()),
             SubCode::TargetGone => {
-                self.drop_target(step, repairer, reads)?;
+                self.drop_target(step, repairer, reads.counted_object())?;
                 return self.set_state(step, repairer, RepairState::Done, reads, roles);
             }
             SubCode::Done | SubCode::Failed => {}
@@ -514,14 +514,14 @@ impl RepairAction {
         }
     }
 
-    /// The repairers of the object `FUN_140ad9050` counts them in (`+0x9e8`) change by `by` at
-    /// once; nothing without one, or once the world no longer holds it.
+    /// The repairers of `counted`, the object `FUN_140ad9050` counts them in (`+0x9e8`), change
+    /// by `by` at once; nothing without one, or once the world no longer holds it.
     ///
     /// # Errors
     ///
     /// None (an unreachable error where a table lost the part it took).
-    fn count(step: &mut Step<'_>, reads: &RepairReads, by: i8) -> GenieResult<()> {
-        if let Some((id, _)) = reads.counted_in
+    fn count(step: &mut Step<'_>, counted: Option<ObjectId>, by: i8) -> GenieResult<()> {
+        if let Some(id) = counted
             && step.world.object(id).is_some()
         {
             let builder_count = step.world.parts.repairers_mut(id)?;
@@ -530,17 +530,17 @@ impl RepairAction {
         Ok(())
     }
 
-    /// Slot 0x68 with none (`FUN_140ada470`): a counted action leaves its target's repairers
-    /// (`FUN_140ad9050`'s object), then the base lets the target go (`FUN_140a7a230`: the
-    /// target's slot 0x180, [`crate::world::lets::release`]).
+    /// Slot 0x68 with none (`FUN_140ada470`): a counted action leaves the repairers of
+    /// `counted` (`FUN_140ad9050`'s object), then the base lets the target go (`FUN_140a7a230`:
+    /// the target's slot 0x180, [`crate::world::lets::release`]).
     pub(super) fn drop_target(
         &mut self,
         step: &mut Step<'_>,
         repairer: &mut Unit,
-        reads: &RepairReads,
+        counted: Option<ObjectId>,
     ) -> GenieResult<()> {
         if self.counted {
-            Self::count(step, reads, -1)?;
+            Self::count(step, counted, -1)?;
             self.counted = false;
         }
         let target = self.target.take();
@@ -553,14 +553,13 @@ impl RepairAction {
 
     /// `set_state` (`0x140ad9c60`): a counted action leaves its target's repairers, the
     /// sub-actions go (a walking `MoveTo`'s teardown stops the unit: [`RepairAction::leave`]),
-    /// then by the new state: 1
-    /// lets the target go (slot 0x68 with none) and posts notify 0x1fa unless quiet; 1, 2 and 3
-    /// (with notify 0x202) give the unit its standing sprite; 4 takes the target's place and a
-    /// `MoveTo` to the target; 6 takes its place and shows the task's moving sprite; 7 shows its
-    /// proceeding sprite (its sound, slot 0x4c0, is not held) and counts the action among the
-    /// target's repairers; slot 0x68 shows the master's standing sprite for none. 10 waits a
-    /// second with the standing sprite (a ship target's move to the unit is
-    /// not modelled); 11 walks to the point (a quiet `MoveTo`).
+    /// then by the new state: 1 lets the target go (slot 0x68 with none) and posts notify 0x1fa
+    /// unless quiet; 1, 2 and 3 (with notify 0x202) give the unit its standing sprite; 4 takes
+    /// the target's place and a `MoveTo` to the target; 6 takes its place and shows the task's
+    /// moving sprite; 7 shows its proceeding sprite (its sound, slot 0x4c0, is not held) and
+    /// counts the action among the target's repairers; slot 0x68 shows the master's standing
+    /// sprite for none. 10 waits a second with the standing sprite (a ship target's move to the
+    /// unit is not modelled); 11 walks to the point (a quiet `MoveTo`).
     pub(super) fn set_state(
         &mut self,
         step: &mut Step<'_>,
@@ -569,14 +568,15 @@ impl RepairAction {
         reads: &RepairReads,
         roles: &Roles,
     ) -> GenieResult<()> {
-        self.leave(step, repairer, reads)?;
+        self.leave(step, repairer, reads.counted_object())?;
         self.state = state.bare();
         self.enter(step, repairer, reads, roles)
     }
 
     /// `set_state(3)` ([`RepairAction::set_state`] with 3, whose case reads none of the build
-    /// layer's roles): the prelude ([`RepairAction::leave`]), then its unit AI hears notify 0x202
-    /// and the repairer shows its standing sprite. Its target stays.
+    /// layer's roles): the prelude ([`RepairAction::leave`] of `counted`, the object its
+    /// repairers count in), then its unit AI hears notify 0x202 and the repairer shows its
+    /// standing sprite. Its target stays.
     ///
     /// # Errors
     ///
@@ -585,16 +585,16 @@ impl RepairAction {
         &mut self,
         step: &mut Step<'_>,
         repairer: &mut Unit,
-        reads: &RepairReads,
+        counted: Option<ObjectId>,
     ) -> GenieResult<()> {
-        self.leave(step, repairer, reads)?;
+        self.leave(step, repairer, counted)?;
         self.state = RepairState::Idle;
         wait_for_work(step, repairer)
     }
 
-    /// The prelude of every `set_state` (`0x140ad9c60`): a counted action leaves its target's
-    /// repairers (`FUN_140ad9050`'s object, [`RepairReads::counted_in`]), then the sub-actions go
-    /// (`FUN_140a98620`: a walking `MoveTo`'s teardown stops the unit, slot 0x5d0).
+    /// The prelude of every `set_state` (`0x140ad9c60`): a counted action leaves the repairers
+    /// of `counted` (`FUN_140ad9050`'s object), then the sub-actions go (`FUN_140a98620`: a
+    /// walking `MoveTo`'s teardown stops the unit, slot 0x5d0).
     ///
     /// # Errors
     ///
@@ -603,10 +603,10 @@ impl RepairAction {
         &mut self,
         step: &mut Step<'_>,
         repairer: &Unit,
-        reads: &RepairReads,
+        counted: Option<ObjectId>,
     ) -> GenieResult<()> {
         if self.counted {
-            Self::count(step, reads, -1)?;
+            Self::count(step, counted, -1)?;
             self.counted = false;
         }
         if self.state.take_move_to().is_some()

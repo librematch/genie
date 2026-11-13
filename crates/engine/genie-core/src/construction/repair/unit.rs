@@ -53,6 +53,7 @@ use crate::world::layer::Roles;
 use crate::world::layer::generated::MovementTuning;
 use crate::world::objects_ref::ObjectsRef;
 use crate::world::others::OthersRef;
+use crate::world::parts::Parts;
 use crate::world::slots::CheckedIndexExt;
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
@@ -83,20 +84,30 @@ impl Unit {
     }
 
     /// The Repair's slot 0x28 with 0 (`FUN_140ad9030`), as the action list's deletion restarts it
-    /// at the head (`FUN_140a98e20`): `set_state(3)` ([`RepairAction::idle`]) with what the
-    /// Repair reads where the unit stands ([`Unit::repair_reads`]: the object its repairers count
-    /// in).
+    /// at the head (`FUN_140a98e20`): `set_state(3)` ([`RepairAction::idle`]) with the one value
+    /// it reads where the unit stands, the object its repairers count in
+    /// ([`counted_object_of`]), none for a target the world does not hold.
     ///
     /// # Errors
     ///
-    /// [`Unit::repair_reads`]' and [`RepairAction::idle`]'s.
+    /// An owner the world lacks, a target without its master, and [`RepairAction::idle`]'s.
     pub(crate) fn restart_repair(
         &mut self,
         repair_action: &mut RepairAction,
         step: &mut Step<'_>,
     ) -> GenieResult<()> {
-        let reads = self.repair_reads(step, repair_action.target, &step.world.model.roles)?;
-        repair_action.idle(step, self, &reads)
+        let others = OthersRef::of(&step.world.players, &step.world.index, step.player)?;
+        let target = repair_action.target.map(RepairTargetId::id);
+        let counted = match target.and_then(|id| Some((id, others.find(id)?))) {
+            Some((target, (player_id, target_unit))) => {
+                let kind = target_unit
+                    .master(step.world.master_tables(), player_id)?
+                    .kind;
+                counted_object_of(&step.world.parts, others, target, kind)
+            }
+            None => None,
+        };
+        repair_action.idle(step, self, counted)
     }
 
     /// What the Repair's update reads as it starts ([`RepairReads`]): its `target` and the
@@ -229,15 +240,15 @@ fn repair_master(every: MasterTables<'_>, player_id: PlayerId, unit: &Unit) -> G
 }
 
 /// The Repair's `target` as its update reads it ([`Repairee`]) and the object `FUN_140ad9050`
-/// counts its repairers in (the target, an annex's main building) with their count: none for a
-/// target the world does not hold.
+/// counts its repairers in ([`counted_object_of`]: the target, an annex's main building) with
+/// their count: none for a target the world does not hold.
 fn repairee_of(
     step: &Step<'_>,
     others: OthersRef<'_>,
     target: Option<ObjectId>,
 ) -> GenieResult<(Option<Repairee>, CountedIn)> {
-    let held = |id: ObjectId| others.find(id);
-    let Some((target, (player_id, target_unit))) = target.and_then(|id| Some((id, held(id)?)))
+    let Some((target, (player_id, target_unit))) =
+        target.and_then(|id| Some((id, others.find(id)?)))
     else {
         return Ok((None, None));
     };
@@ -264,18 +275,29 @@ fn repairee_of(
             // slot 0xe8: the master's speed (`+0x740`), before a sprite's factor
             && Speed::ZERO < tm.animated_part().max_speed,
     };
-    let counting = if tm.kind == MasterKind::BUILDING {
-        step.world
-            .parts
-            .building_of(target_unit.id)
+    let counted_in = counted_object_of(&step.world.parts, others, target, tm.kind)
+        .map(|counted| (counted, step.world.parts.repairers_of(counted)));
+    Ok((Some(repairee), counted_in))
+}
+
+/// The object `FUN_140ad9050` counts a Repair's repairers in, for its `target` (an object the
+/// world holds, of a master of type `kind`): a building annex's main building (`+0xbb8`), else
+/// the target; none once the world does not hold that object.
+fn counted_object_of(
+    parts: &Parts,
+    others: OthersRef<'_>,
+    target: ObjectId,
+    kind: MasterKind,
+) -> Option<ObjectId> {
+    let counting = if kind == MasterKind::BUILDING {
+        parts
+            .building_of(target)
             .annex_of
             .map_or(target, MainBuildingId::id)
     } else {
         target
     };
-    let counted_in =
-        held(counting).map(|(_, unit)| (counting, step.world.parts.repairers_of(unit.id)));
-    Ok((Some(repairee), counted_in))
+    others.find(counting).map(|_| counting)
 }
 
 /// The repair of `target` by `amount` (a building's or a combat unit's slot 0x8c8, any other's slot

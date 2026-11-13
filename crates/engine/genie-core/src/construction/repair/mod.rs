@@ -183,5 +183,13 @@ pub(crate) struct RepairReads {
     pub(crate) restriction: Option<RestrictionId>,
 }
 
+impl RepairReads {
+    /// The object `FUN_140ad9050` counts the repairers in ([`RepairReads::counted_in`]'s),
+    /// without their count: what a count's change and a leave read.
+    pub(crate) fn counted_object(&self) -> Option<ObjectId> {
+        self.counted_in.map(|(object, _)| object)
+    }
+}
+
 #[cfg(test)]
 mod tests;

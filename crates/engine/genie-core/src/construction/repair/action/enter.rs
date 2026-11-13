@@ -43,8 +43,8 @@ impl RepairAction {
             }
             RepairState::Work => {
                 show(step, repairer, self.task.sprites.proceeding, reads.standing)?;
-                if reads.counted_in.is_some() {
-                    Self::count(step, reads, 1)?;
+                if let Some(counted) = reads.counted_object() {
+                    Self::count(step, Some(counted), 1)?;
                     self.counted = true;
                 }
             }
@@ -74,7 +74,7 @@ impl RepairAction {
         repairer: &mut Unit,
         reads: &RepairReads,
     ) -> GenieResult<()> {
-        self.drop_target(step, repairer, reads)?;
+        self.drop_target(step, repairer, reads.counted_object())?;
         if self.voice.is_loud() {
             notify(step, repairer, NotifyKind::ACTION_COMPLETED)?;
         }

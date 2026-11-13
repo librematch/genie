@@ -14437,6 +14437,53 @@ fn deleted_head_over_repair_waits_for_work() {
     }
 }
 
+/// A counted Repair that a deleted head restarts (`FUN_140ad9030` with 0) leaves the repairers
+/// of the object `FUN_140ad9050` counts them in: town centre 9150, an annex of 9149, counts
+/// them in its main building, so 9149's go down and 9150's stay; for a target the world does
+/// not hold none change. Either way the Repair is counted no longer.
+#[test]
+fn deleted_head_over_repair_leaves_the_repairers_of_the_counted_object() {
+    for (target, repairers) in [(9150, (0, 1)), (9177, (1, 1))] {
+        let repair_action = RepairAction {
+            target: Some(RepairTargetId::new(object_id(target))),
+            state: RepairState::Work,
+            point: Position::new(20.0, 20.0, 0.0),
+            timer: Seconds::ZERO,
+            task: RepairTask::of(&Task::default()),
+            range: Distance::ZERO,
+            counted: true,
+            voice: Voice::Loud,
+        };
+        let mut world = walking_villager_holding(wait_over(
+            ActionList::default().with_repair(Some(repair_action)),
+        ));
+        world.parts.building_mut(object_id(9150)).unwrap().annex_of =
+            Some(MainBuildingId::new(object_id(9149)));
+        for town_centre in [9149, 9150] {
+            *world.parts.repairers_mut(object_id(town_centre)).unwrap() = BuilderCount::of_data(1);
+        }
+        delete_villager_head(&mut world).unwrap();
+        assert_eq!(
+            world
+                .parts
+                .actions_of(object_id(40))
+                .list
+                .repair()
+                .map(|repair| (repair.state, repair.counted)),
+            Some((RepairState::Idle, false)),
+            "{target}"
+        );
+        assert_eq!(
+            (
+                world.parts.repairers_of(object_id(9149)).get(),
+                world.parts.repairers_of(object_id(9150)).get()
+            ),
+            repairers,
+            "{target}"
+        );
+    }
+}
+
 /// A deleted head over a Fly restarts it with 0 (`0x140a84900`): only `set_state(3)`
 /// (`0x140a84a50`): a `MoveTo` it flew goes and stops the unit (one resting leaves it moving),
 /// and the flight's time is drawn once from the Action stream; its sprite and its unit AI are
