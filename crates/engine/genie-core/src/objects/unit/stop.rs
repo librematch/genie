@@ -10,10 +10,13 @@ use crate::objects::actions::Action as ActionsAction;
 use crate::objects::layers::Action;
 use crate::objects::layers::MotionMut;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMastersExt;
 use crate::objects::release::Releaser;
-use crate::objects::sprite::new_sprite;
+use crate::objects::sprite::Cargo;
+use crate::objects::sprite::Graphic;
+use crate::objects::sprite::{new_sprite, standing};
 use crate::objects::teardown::{NextHead, admit};
 use crate::objects::unit::STOPPED_SPRITE_LACKING;
 use crate::objects::unit::Unit;
@@ -25,10 +28,12 @@ use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
 impl Unit {
-    /// stopAction (slot 0x3c0, `FUN_14108c160`): the action list goes ([`Unit::tear_down_actions`],
-    /// with the target of the unit AI the world holds: the AI's calls return it there,
-    /// [`crate::unit_ai::world_view::UnitView::effect_now`]) and a unit in state 2 takes its
-    /// standing sprite (slot 0x68 with slot 0x798's, [`Unit::show_standing`]).
+    /// stopAction (slot 0x3c0, `FUN_14108c160`, the combat objects' and the missiles'): the
+    /// action list goes ([`Unit::tear_down_actions`], with the target of the unit AI the world
+    /// holds: the AI's calls return it there,
+    /// [`crate::unit_ai::world_view::UnitView::effect_now`]), then a unit in state 2 shows slot
+    /// 0x798's sprite ([`Unit::standing_shown`]) with slot 0x68 ([`Unit::show_graphic_standing`]).
+    /// The debug log around them (`DAT_143f09029`) reads the world time and changes nothing.
     ///
     /// # Errors
     ///
@@ -42,13 +47,10 @@ impl Unit {
         let ai_target = step.world.ai_target(self.id);
         self.tear_down_actions(actions, step, ai_target, by)?;
         if self.life.state == ObjectState::Alive {
-            self.show_standing(
+            let standing = self.standing_shown(step)?;
+            self.show_graphic_standing(
                 step.world.parts.motion.layer_mut(self.id),
-                OwnerMasters::new(
-                    &step.world.parts.own_master,
-                    step.world.model.masters.of(step.player),
-                ),
-                &step.world.model.graphics,
+                standing,
                 step.world.streams.get_mut(Stream::Sprite),
                 step.world.model.tuning.sprite,
             )?;
@@ -56,15 +58,42 @@ impl Unit {
         Ok(())
     }
 
-    /// The action list's deletion (`FUN_140a98620`) as the unit's own commands and stops run it
-    /// ([`Unit::clear_own_actions`]) on its action layer `actions`, the target `ai_target` of
-    /// its unit AI (which its top speed reads) and the unit as `by`; an action the slice does
-    /// not hold has a teardown it cannot run (the load could not read it whole,
-    /// [`crate::world::Unread`]).
+    /// Slot 0x798 of the unit, its standing sprite where the slice's graphics hold it: a TRIBE
+    /// combat object's or a building's (types 70 and 80, `FUN_1412029f0`, [`standing`]) is its
+    /// terrain look's, else its master's (`+0x470`); any other object's (`FUN_141188900`) is its
+    /// master's alone. A trade cart's goods (`+0x7a0`) are not held: it counts as empty
+    /// ([`Cargo::Empty`]), as every other read of slot 0x798 does.
     ///
     /// # Errors
     ///
-    /// A list the load could not read whole, and the deletion's.
+    /// A master the slice does not have.
+    fn standing_shown(&self, step: &Step<'_>) -> GenieResult<Option<Graphic>> {
+        let master = self.master_in(OwnerMasters::new(
+            &step.world.parts.own_master,
+            step.world.model.masters.of(step.player),
+        ))?;
+        let sprite_id = if MasterKind::COMBAT <= master.kind {
+            let look = step.world.parts.combat_of(self.id).abilities.look.as_ref();
+            standing(master, look, Cargo::Empty, &step.world.model.roles)
+        } else {
+            master.standing_sprite
+        };
+        Ok(sprite_id
+            .and_then(|sprite_id| step.world.model.graphics.get(sprite_id))
+            .copied())
+    }
+
+    /// The action list's deletion (`FUN_140a98620`) as the unit's own commands and stops run it
+    /// ([`Unit::clear_own_actions`]) on its action layer `actions`, the target `ai_target` of
+    /// its unit AI (which its top speed reads) and the unit as `by`. A unit the load could not
+    /// read whole stops the run with the import's error ([`Unread::error`]): the slice does not
+    /// hold the list the game deletes.
+    ///
+    /// [`Unread::error`]: crate::world::Unread::error
+    ///
+    /// # Errors
+    ///
+    /// A unit the load could not read whole, and the deletion's.
     pub(crate) fn tear_down_actions(
         &mut self,
         actions: &mut Action,
@@ -72,24 +101,23 @@ impl Unit {
         ai_target: Option<ObjectId>,
         by: Releaser,
     ) -> GenieResult<()> {
-        if step.world.parts.unread.contains(self.id) {
-            return Err(GenieError::unsupported(
-                "a unit AI's stop of an action list the slice does not model",
-            ));
+        if let Some(unread) = step.world.parts.unread.get(self.id) {
+            return Err(unread.error());
         }
         self.clear_own_actions(actions, step, ai_target, by)
     }
 
-    /// The unit's slot 0x68 with its master's standing sprite (slot 0x798's, the master's
-    /// `+0x470`): its top speed becomes the standing sprite's ([`MoveToAction::shows_standing`])
-    /// and, where the slice holds its sprite, the sprite starts
-    /// ([`crate::objects::sprite::new_sprite`] on the Sprite stream). Its master is its own or its
-    /// owner's (`masters`).
+    /// The unit's slot 0x68 with its master's standing sprite (its `+0x470`, which the Repair's
+    /// and the Transport's `set_state` read themselves, not through slot 0x798), its master its
+    /// own or its owner's (`masters`): [`Unit::show_graphic_standing`]. A routine that calls slot
+    /// 0x798 shows that slot's sprite instead ([`Unit::standing_shown`]).
     ///
-    /// [`MoveToAction::shows_standing`]: crate::movement::move_to::MoveToAction::shows_standing
+    /// # Errors
+    ///
+    /// A master the slice does not have, and a sprite the slice holds without its standing one.
     pub(crate) fn show_standing(
         &mut self,
-        mut motion: MotionMut<'_>,
+        motion: MotionMut<'_>,
         masters: OwnerMasters<'_>,
         graphics: &Graphics,
         sprite: &mut Well512,
@@ -100,6 +128,25 @@ impl Unit {
             .standing_sprite
             .and_then(|sprite_id| graphics.get(sprite_id))
             .copied();
+        self.show_graphic_standing(motion, standing, sprite, sprite_tuning)
+    }
+
+    /// The unit's slot 0x68 with the standing sprite `standing` (none where the slice's graphics
+    /// lack it): its top speed becomes the sprite's ([`MoveToAction::shows_standing`]) and,
+    /// where the slice holds its sprite, the sprite starts ([`new_sprite`] on the Sprite stream).
+    ///
+    /// [`MoveToAction::shows_standing`]: crate::movement::move_to::MoveToAction::shows_standing
+    ///
+    /// # Errors
+    ///
+    /// A sprite the slice holds without the standing one.
+    fn show_graphic_standing(
+        &mut self,
+        mut motion: MotionMut<'_>,
+        standing: Option<Graphic>,
+        sprite: &mut Well512,
+        sprite_tuning: SpriteTuning,
+    ) -> GenieResult<()> {
         if let Some(mover) = motion.mover_mut() {
             mover.shows(standing.as_ref());
         }

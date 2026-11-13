@@ -2,6 +2,7 @@ use super::*;
 use crate::combat::Firepower;
 use crate::combat::KillState;
 use crate::combat::abilities::Abilities;
+use crate::combat::abilities::Look;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::{Arms, Attack};
 use crate::combat::damage::ArmorPair;
@@ -14571,6 +14572,100 @@ fn each_destructor_reads_the_top_speed_the_restarts_before_it_left() {
             (Speed::new(0.8), Speed::new(0.8))
         );
     }
+}
+
+/// The unit's stop (slot 0x3c0, `FUN_14108c160`): its list goes, then a unit alive (state 2)
+/// shows slot 0x798's sprite. A TRIBE combat object's (type 70, `FUN_1412029f0`) is its terrain
+/// look's standing sprite where it has one (the top speed that sprite's, 1.6 off the base 0.8),
+/// else its master's (none here: the base); an RGE combat object's (type 50, `FUN_141188900`) is
+/// its master's whatever look it holds. A unit in state 3 shows none: its walking 1.3 stays.
+#[test]
+fn stop_of_alive_unit_shows_its_terrain_look_or_master_standing_sprite() {
+    let looked = Graphic {
+        id: SpriteId::named(77),
+        frames: Frame::of_data(10),
+        facets: FacetCount::of_data(16),
+        speed_multiplier: SpeedMultiplier::of_data(2.0),
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
+        flags: SpriteFlags::ANIMATED,
+    };
+    for (kind, look, state, speed) in [
+        (
+            MasterKind::COMBAT,
+            None,
+            ObjectState::Alive,
+            Speed::new(0.8),
+        ),
+        (
+            MasterKind::COMBAT,
+            Some(SpriteId::named(77)),
+            ObjectState::Alive,
+            Speed::new(1.6),
+        ),
+        (
+            MasterKind::RGE_COMBAT,
+            Some(SpriteId::named(77)),
+            ObjectState::Alive,
+            Speed::new(0.8),
+        ),
+        (
+            MasterKind::COMBAT,
+            Some(SpriteId::named(77)),
+            ObjectState::Dying,
+            Speed::new(1.3),
+        ),
+    ] {
+        let mut world = walking_villager_holding(wait_over(ActionList::default()));
+        world.players[1].objects[ListIndex::new(2)].life.state = state;
+        for masters in &mut world.model.masters {
+            *masters = Arc::new(Masters::new(masters.iter().cloned().map(|master| {
+                if master.id == VILLAGER_MALE {
+                    Master { kind, ..master }
+                } else {
+                    master
+                }
+            })));
+        }
+        let _ = Arc::make_mut(&mut world.model.graphics).insert(SpriteId::named(77), looked);
+        world
+            .parts
+            .combat_mut(object_id(40))
+            .unwrap()
+            .abilities
+            .look = look.map(|standing| Look {
+            standing: Some(standing),
+            walking: None,
+            attacking: None,
+            running: None,
+            dying: None,
+            undead: None,
+        });
+        world
+            .run_on_step(PlayerId::new(1), ListIndex::new(2), Unit::stop_action)
+            .unwrap();
+        assert!(world.parts.actions_of(object_id(40)).list.is_empty());
+        assert_eq!(
+            villager_speeds(&world).0,
+            speed,
+            "{kind:?} {look:?} {state:?}"
+        );
+    }
+}
+
+/// The stop of a unit the load could not read whole stops the run with the import's error
+/// ([`Unread::error`]): the slice does not hold the list the game would delete.
+#[test]
+fn stop_of_unread_unit_fails_with_the_import_error() {
+    let mut world = walking_villager_holding(wait_over(ActionList::default()));
+    world.set_unread(object_id(40), GenieError::unsupported("a saved action"));
+    let stopped = in_update(
+        &mut world,
+        (PlayerId::new(1), ListIndex::new(2)),
+        50,
+        Unit::stop_action,
+    );
+    assert_eq!(stopped.unwrap_err().reason(), "a saved action");
 }
 
 /// `FUN_1411e63f0` then `FUN_1411e6580` at a built building's death: each storage entry of mode
