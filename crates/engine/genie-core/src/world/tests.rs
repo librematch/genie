@@ -13800,21 +13800,26 @@ fn clearing_three_actions_restarts_the_second_and_the_third() {
     }
 }
 
-/// Each restart comes after the teardown before it let go, and before the next deletion: an
-/// Attack whose restart is not ported stops the deletion at the head after the walk let town
-/// centre 9149 go (and, with a Make between them, after the Make restarted), untouched; from the
-/// world and from the unit's step alike.
+/// Each restart comes after the teardown before it let go, and before the next deletion: a
+/// bird's Fly, whose restart is not ported, stops the deletion at the head after the walk let
+/// town centre 9149 go (and, with a Make between them, after the Make restarted), untouched; from
+/// the world and from the unit's step alike.
 #[test]
 fn each_restart_follows_the_teardown_before_it() {
-    let attack = ActionList::default().with_attack(Some(own_attack(9150, -1, AttackState::New)));
+    let resting = Fly {
+        state: FlyState::Resting,
+        timer: Seconds::new(2.0),
+        home: Point::new(10.5, 10.5),
+        task: Task::default(),
+    };
+    let fly = ActionList::default().with_fly(Some(resting));
     for (list, holding) in [
         (
-            attack.clone().with_move_to(Some(walk_to_town_centre())),
+            fly.clone().with_move_to(Some(walk_to_town_centre())),
             (Some(attribute::FOOD), Amount::new(15.0)),
         ),
         (
-            attack
-                .clone()
+            fly.clone()
                 .with_make(Some(made_farm_food()))
                 .with_move_to(Some(walk_to_town_centre())),
             (Some(attribute::FARM_FOOD), Amount::ZERO),
@@ -13834,7 +13839,7 @@ fn each_restart_follows_the_teardown_before_it() {
             .unwrap_err();
         for (stopped, error) in [(world, error), (stepped, step_error)] {
             assert_eq!(error.reason(), NEXT_HEAD);
-            assert_eq!(stopped.parts.actions_of(object_id(40)).list, attack);
+            assert_eq!(stopped.parts.actions_of(object_id(40)).list, fly);
             assert_eq!(
                 town_workers_and_holding(&stopped),
                 (0, 1, holding.0, holding.1)

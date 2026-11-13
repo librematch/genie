@@ -1443,7 +1443,7 @@ fn ready_to_attack_on_target_out_of_sight_fails_or_waits() {
 }
 
 /// The players' sight over a 16×16 map: every tile revealed and explored (seen), or none.
-fn sight(seen: bool) -> Visibility {
+pub(crate) fn sight(seen: bool) -> Visibility {
     let word = if seen {
         VisionBits::NO_TILE | VisionBits::NO_TILE_EXPLORED
     } else {
@@ -2219,6 +2219,8 @@ fn engaged(gap: Distance, speed: f32, can_move: bool, stance: UnitStance) -> Eng
         master: master_id(4),
         target_class: class::CLASS_6,
         same_owner: false,
+        moves: speed > 0.0,
+        next_volley: MissileCount::ZERO,
     }
 }
 
@@ -2229,7 +2231,7 @@ fn standing_arms() -> Arms {
     }
 }
 
-/// What the attack command's start found ([`Attack::own_start`] on target 7 of `owner`,
+/// What the start of a unit's own Attack found ([`Attack::begin_own`] on target 7 of `owner`,
 /// `visible` or not): the Attack, readyToAttack's answer and the notifies it posted.
 #[derive(Debug)]
 struct Started {
@@ -2259,10 +2261,24 @@ fn own_start_among(
     owner: PlayerId,
     mover: &mut Mover,
 ) -> GenieResult<Started> {
-    let cmd = AttackCommand {
+    let attack = Attack::own(object_id(7), engagement, arms);
+    begin_own_with(attack, world, by_id, engagement, visible, owner, mover)
+}
+
+/// The start of `attack` on target 7 of `owner` ([`Attack::begin_own`]) among the objects `by_id`
+/// of `world`, `visible` or not.
+fn begin_own_with(
+    mut attack: Attack,
+    world: &Spatial,
+    by_id: ObjectsRef<'_>,
+    engagement: &Engagement,
+    visible: bool,
+    owner: PlayerId,
+    mover: &mut Mover,
+) -> GenieResult<Started> {
+    let start = OwnStart {
         target: object_id(7),
         engagement,
-        arms,
         visible,
         target_owner: owner,
         ready: None,
@@ -2273,7 +2289,7 @@ fn own_start_among(
         ObjectState::Alive,
         engagement.speed.get(),
     );
-    let (attack, begun, posted) = Attack::own_start(&cmd, (world, by_id), mover, &reads)?;
+    let (begun, posted) = attack.begin_own(&start, world, by_id, mover, &reads)?;
     Ok(Started {
         attack,
         begun,
@@ -2458,6 +2474,62 @@ fn the_start_of_unit_that_may_move_turns_to_state_4_whatever_ready_to_attack_fou
     )
     .unwrap();
     assert_eq!((started.begun, started.posted), (Begun::Failed, vec![]));
+}
+
+/// readyToAttack's ready-at-once test at the start of an Attack that holds a point (a deletion's
+/// restart): a target on the point is ready at once, out of reach of a unit that cannot move
+/// (`set_state(6)`, no 0x1fd, the point kept); within half a tile of it the unit's master that
+/// moves (`FUN_140fdd080`) or a volley under way (`FUN_1412161a0`) makes it so; with neither the
+/// reach decides (0x1fd, `set_state(13)`), as it does for the constructor's point (−1).
+#[test]
+fn the_start_of_attack_on_its_point_is_ready_at_once() {
+    let far = engaged(Distance::new(3.0), 0.0, false, UnitStance::StandGround);
+    let world = world_with(7, PlayerId::new(2), class::CLASS_6, far.target_position);
+    let start = |engagement: &Engagement, point: Position| {
+        let mut mover = soldier_mover(engagement.speed.get());
+        let attack = Attack {
+            point,
+            ..Attack::own(object_id(7), engagement, standing_arms())
+        };
+        begin_own_with(
+            attack,
+            &world,
+            ObjectsRef::empty(),
+            engagement,
+            true,
+            PlayerId::new(2),
+            &mut mover,
+        )
+        .unwrap()
+    };
+    let on = start(&far, far.target_position);
+    assert_eq!((on.begun, on.posted), (Begun::Ready, vec![]));
+    assert_eq!(on.attack.point, far.target_position);
+    let beside = Position::new(far.target_position.x() - 0.4, 10.0, 0.0);
+    let unset = Position::new(NONE, NONE, NONE);
+    let ready = (Begun::Ready, vec![]);
+    let away = (Begun::Failed, vec![(NotifyKind::OUT_OF_REACH, [0; 3])]);
+    let mobile = Engagement { moves: true, ..far };
+    let volleying = Engagement {
+        next_volley: MissileCount::of_data(1),
+        ..far
+    };
+    for (engagement, point, begun) in [
+        (far, beside, away.clone()),
+        (mobile, beside, ready.clone()),
+        (volleying, beside, ready),
+        (mobile, unset, away.clone()),
+        (volleying, unset, away),
+    ] {
+        let started = start(&engagement, point);
+        assert_eq!(
+            (started.begun, started.posted),
+            begun,
+            "{point:?} {}",
+            engagement.moves
+        );
+        assert_eq!(started.attack.point, point);
+    }
 }
 
 /// readyToAttack's ready end turns the unit to its target (`FUN_141162db0`) but for masters

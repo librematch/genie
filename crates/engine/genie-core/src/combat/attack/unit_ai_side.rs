@@ -4,21 +4,19 @@
 
 use crate::combat::attack::AttackSource;
 use crate::combat::attack::{
-    Attack, AttackCommand, Mark, ReadyReads, Wielder, arms_looking, engagement,
+    Attack, Mark, OwnStart, ReadyReads, Wielder, arms_looking, engagement, target_in_sight,
 };
 use crate::combat::attack::{AttackReads, Fight};
 use crate::combat::damage::Victim;
 use crate::combat::victims::{ChargeOf, VictimLayers, VictimView};
 use crate::combat::victims::{victim_in, victim_of};
 use crate::combat::{AttackCount, AttackTargetId};
-use crate::map::Tile;
 use crate::map::spatial::Placed;
 use crate::math::rng::Stream;
 use crate::math::rng::Well512;
 use crate::objects::ObjectId;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
-use crate::objects::masters::FogVisibility;
 use crate::objects::masters::Master;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::TaskSprites;
@@ -26,6 +24,7 @@ use crate::objects::masters::player_master;
 use crate::objects::masters::player_masters;
 use crate::objects::release::Releaser;
 use crate::objects::sprite::new_sprite;
+use crate::objects::teardown::HeadStart;
 use crate::orders::{PACK_OR_UNPACK, placed_reach};
 use crate::unit_ai::Attacked;
 use crate::unit_ai::OrderForce;
@@ -48,13 +47,13 @@ impl UnitView<'_, '_> {
     /// `+0x648` takes the world's time (not held); the unit's own Attack on the target answers
     /// true, forced after its slot 0x48 on it ([`UnitView::attack_again`]); a villager's master
     /// switch (slot 0x90) is not modelled. Then the new Attack
-    /// ([`crate::combat::attack::Attack::command`]): the constructor takes its target (slot 0x178,
+    /// ([`crate::combat::attack::Attack::own`]): the constructor takes its target (slot 0x178,
     /// through the view) and clears the unit's `+0x900` (its target is new), the action list clears
-    /// ([`UnitView::attack_clears_actions`]), and the install's start (`0x140a7f8c0`) of a unit
-    /// inside another fails it at once (`set_state(13)`,
-    /// [`crate::combat::attack::Attack::fail_at_start`]); else it puts the unit on its standing
-    /// sprite (slot 0x68 with `+0x80`) and runs the range test
-    /// ([`crate::combat::attack::Attack::begin`]): readyToAttack's failure before a `set_state(4)`
+    /// ([`UnitView::attack_clears_actions`]), and the install's start (`0x140a7f8c0` with 1) of a
+    /// unit inside another fails it at once (`set_state(13)`,
+    /// [`crate::combat::attack::Attack::fail_at_start`]); else it clears `+0x900` again, puts the
+    /// unit on its standing sprite (slot 0x68 with `+0x80`) and runs the range test
+    /// ([`crate::combat::attack::Attack::start_own`]): readyToAttack's failure before a `set_state(4)`
     /// leaves the animation at speed 1; a `MoveTo` that starts arrived shows the standing sprite; a
     /// unit that cannot move in reach goes ready (`set_state(6)`,
     /// [`crate::combat::attack::Attack::enter_ready`]: readyToAttack again, then the swing, `set_state(7)`,
@@ -107,7 +106,12 @@ impl UnitView<'_, '_> {
             .get(self.unit.id)
             .ok_or(ATTACKER_UNPLACED)?;
         let target_master = self.step.world.master_tables().of_placed(target, &placed)?;
-        let visible = self.target_visible(&placed, target_master)?;
+        let visible = target_in_sight(
+            &self.step.world.spatial,
+            self.player,
+            &placed,
+            target_master.fog_visibility,
+        )?;
         let unit = &mut *self.unit;
         // the attack command's Attack (`FUN_141081a80`) takes no MoveTo sprite: the unit's
         let look = self
@@ -149,6 +153,7 @@ impl UnitView<'_, '_> {
             &me_at,
             &placed,
             self.step.world.world_time,
+            self.step.world.parts.combat_of(unit.id).next_volley,
         )?;
         // the constructor clears +0x900 for a target other than its own (none yet)
         self.step.world.parts.combat_mut(unit.id)?.attack_count = AttackCount::ZERO;
@@ -162,16 +167,16 @@ impl UnitView<'_, '_> {
             self.step.world.streams.get_mut(Stream::Sprite),
             self.step.world.model.tuning.sprite,
         );
-        let cmd = AttackCommand {
+        let start = OwnStart {
             target,
             engagement: &engagement,
-            arms,
             visible,
             target_owner: placed.player,
             ready: self.ready_reads(target, master, ai, roles)?,
         };
         let unit = &mut *self.unit;
-        let (attack, posted) = Attack::command(self.step, unit, &cmd, roles)?;
+        let mut attack = Attack::own(target, &engagement, arms);
+        let posted = attack.start_own(self.step, unit, HeadStart::Added, &start, roles)?;
         self.actions.list.set_attack(Some(attack));
         self.take(target, by, roles)?;
         Ok(Attacked {
@@ -493,27 +498,6 @@ impl UnitView<'_, '_> {
             reads,
             fight: Fight { victim, own },
         }))
-    }
-
-    /// The attack command's sight of its target `placed` (of master `target_master`): its tile seen
-    /// by the unit's player, or explored when the master shows in the fog (its fog flag).
-    ///
-    /// # Errors
-    ///
-    /// A tile the map's sight does not hold.
-    fn target_visible(&self, placed: &Placed, target_master: &Master) -> GenieResult<bool> {
-        let (tx, ty) = (placed.position.x() as i32, placed.position.y() as i32);
-        Ok(self
-            .step
-            .world
-            .spatial
-            .sees_tile(self.player, Tile::new(tx, ty))
-            || (target_master.fog_visibility != FogVisibility::INVISIBLE
-                && self
-                    .step
-                    .world
-                    .spatial
-                    .explored(self.player, Tile::new(tx, ty))?))
     }
 
     /// The attack command's villager swap: a villager (class 4) switches to its player's villager

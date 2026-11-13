@@ -1,7 +1,6 @@
-//! The Attack's constructor (`FUN_140a7c210`) and its start (slot 5): its sprites and frames
-//! and what it reads of its unit and its target.
+//! The Attack's constructor (`FUN_140a7c210`) and its start (slot 5, `0x140a7f8c0`): its sprites
+//! and frames and what it reads of its unit and its target.
 
-use crate::combat::AttackTargetId;
 use crate::combat::abilities::Look;
 use crate::combat::attack::ATTACK_TARGET_NOT_LIVE;
 use crate::combat::attack::AttackState;
@@ -9,9 +8,10 @@ use crate::combat::attack::CHARGE_RANGE;
 use crate::combat::attack::STANDING_SPRITE_LACKING;
 use crate::combat::attack::TARGET_GONE;
 use crate::combat::attack::{
-    Arms, Attack, AttackCommand, AttackReads, Begun, Engagement, Fight, Ground, NONE, Posted,
-    Posts, face_target,
+    Arms, Attack, AttackReads, BeginReads, Begun, Engagement, Fight, Ground, NONE, OwnStart,
+    Posted, Posts, face_target,
 };
+use crate::combat::{AttackCount, AttackTargetId, MissileCount};
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
@@ -37,6 +37,7 @@ use crate::objects::sprite::Cargo;
 use crate::objects::sprite::new_sprite;
 use crate::objects::sprite::{running, walking};
 use crate::objects::task_change::{TaskChange, TaskSprite, swapped};
+use crate::objects::teardown::HeadStart;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::unit_ai::UnitStance;
@@ -107,7 +108,7 @@ impl Attack {
     ///
     /// What the start does not model, and what no hunt's caller takes: a hunter that cannot move
     /// (its Attack's `set_state` 6 or 13 at the start), and readyToAttack's failure before the
-    /// start's `set_state(4)` (the unit's `+0x7b8` at 1, as [`Attack::command`] leaves it).
+    /// start's `set_state(4)` (the unit's `+0x7b8` at 1, as [`Attack::start_own`] leaves it).
     pub(crate) fn start(
         target: ObjectId,
         engagement: &Engagement,
@@ -134,14 +135,13 @@ impl Attack {
             ));
         }
         let mut posted = Vec::new();
-        let begun = attack.begin(
-            (engagement, engagement.gap),
-            (true, PlayerId::GAIA),
-            mover,
-            &mut posted,
-            reads,
-            layer,
-        )?;
+        let sight = BeginReads {
+            engagement,
+            reach_gap: engagement.gap,
+            visible: true,
+            target_owner: PlayerId::GAIA,
+        };
+        let begun = attack.begin(sight, mover, &mut posted, reads, layer)?;
         if begun == Begun::Ready {
             return Err(GenieError::unsupported(
                 "an attack that starts in reach and cannot move (set_state 6)",
@@ -160,75 +160,85 @@ impl Attack {
         Ok((attack, begun.start()))
     }
 
-    /// A unit's own Attack (the attack command, `FUN_141081a80`): the constructor
-    /// (`FUN_140a7c210` with sub-action 0: the master's weapon range and least range, its
-    /// sprites, missile and frames, its `MoveTo`'s the running one, slot 0x7d0, or the walking
-    /// one: the running speed either way; `+0x61` clear) and the start's readyToAttack with its
-    /// `set_state(4)` ([`Attack::begin`]) on `cmd`'s target in `world` (a gate's reach is to its
-    /// nearest part too): the Attack, readyToAttack's answer and the notifies it posted.
+    /// readyToAttack and the `set_state(4)` of the start of a unit's own Attack ([`Attack::begin`])
+    /// on `start`'s target in `world`, its objects `by_id` (a gate's reach is to its nearest part
+    /// too): readyToAttack's answer and the notifies it posted.
     ///
     /// # Errors
     ///
     /// What the start does not model, and a target the world does not hold.
-    pub(super) fn own_start(
-        cmd: &AttackCommand<'_>,
-        (world, by_id): (&Spatial, ObjectsRef<'_>),
+    pub(super) fn begin_own(
+        &mut self,
+        start: &OwnStart<'_>,
+        world: &Spatial,
+        by_id: ObjectsRef<'_>,
         mover: &mut Mover,
         reads: &MoveToReads<'_>,
-    ) -> GenieResult<(Self, Begun, Vec<Posted>)> {
+    ) -> GenieResult<(Begun, Vec<Posted>)> {
         let move_to_tuning = &by_id.tuning().move_to;
         let attack_tuning = &by_id.tuning().attack;
         let roles = by_id.roles();
-        let engagement = cmd.engagement;
-        let placed = *world.get_known(cmd.target)?.ok_or(TARGET_GONE)?;
+        let engagement = start.engagement;
+        let placed = *world.get_known(start.target)?.ok_or(TARGET_GONE)?;
         let ground = mover.stats.radius.ground();
         let reach_gap = gate_gap(
             world,
             (engagement.position, ground),
-            (cmd.target, &placed),
+            (start.target, &placed),
             engagement.gap,
             |distance| distance,
             by_id,
             roles,
         );
-        let mut attack = Self::own(cmd.target, engagement, cmd.arms);
         let mut posted = Vec::new();
-        let begun = attack.begin(
-            (engagement, reach_gap),
-            (cmd.visible, cmd.target_owner),
-            mover,
-            &mut posted,
-            reads,
-            BeginLayer {
-                roles,
-                attack_tuning,
-                move_to_tuning,
-            },
-        )?;
-        Ok((attack, begun, posted))
+        let sight = BeginReads {
+            engagement,
+            reach_gap,
+            visible: start.visible,
+            target_owner: start.target_owner,
+        };
+        let layer = BeginLayer {
+            roles,
+            attack_tuning,
+            move_to_tuning,
+        };
+        let begun = self.begin(sight, mover, &mut posted, reads, layer)?;
+        Ok((begun, posted))
     }
 
-    /// The attack command's Attack of `unit` (the step's, out of the world): the constructor and
-    /// readyToAttack with the start's `set_state(4)` ([`Attack::own_start`]), then the start's
-    /// other ends at once (`0x140a7f8c0`): readyToAttack's `set_state(13)` before the
-    /// `set_state(4)` that replaced it leaves the unit's animation at speed 1 (`+0x7b8`; the
-    /// standing sprite it shows is the start's already); a unit that cannot move fails out of reach
-    /// (`set_state(13)`, [`Attack::fail_at_start`]) or goes ready in it (`set_state(6)`,
-    /// [`Attack::enter_ready`] with `cmd`'s [`ReadyReads`](crate::combat::attack::ReadyReads)); a
-    /// `MoveTo` that starts arrived shows the standing sprite at its speed and clears `+0x7b8`
-    /// (`0x140aa29e0`, not quiet). The Attack and the notifies the start posted, in order, for the
-    /// unit's AI (the swing's of `set_state(6)` among them).
+    /// The start (slot 0x28, `0x140a7f8c0`) of `unit`'s own Attack (the step's, out of the world)
+    /// after its unit AI and place test and its slot 0x68 (the caller's), as `head` says it came to
+    /// the head of the list: the list's add of a new Attack (with 1) clears the unit's attack count
+    /// (`+0x900`), a deletion's restart (with 0) keeps it. Then readyToAttack with the start's
+    /// `set_state(4)` ([`Attack::begin_own`]), and the start's other ends at once: readyToAttack's
+    /// `set_state(13)` before the `set_state(4)` that replaced it leaves the unit's animation at
+    /// speed 1 (`+0x7b8`; the standing sprite it shows is the start's already); a unit that cannot
+    /// move fails out of reach (`set_state(13)`, [`Attack::finish_in`]: a `MoveTo` it held stops
+    /// it) or goes ready in it (`set_state(6)`, [`Attack::enter_ready`] with `start`'s
+    /// [`ReadyReads`](crate::combat::attack::ReadyReads)); a `MoveTo` that starts arrived shows the
+    /// standing sprite at its speed and clears `+0x7b8` (`0x140aa29e0`, not quiet). The notifies the
+    /// start posted, in order, for the unit's AI (the swing's of `set_state(6)` among them).
     ///
     /// # Errors
     ///
     /// What the start does not model, a target the world does not hold, a unit without its
     /// movement state, and a start that goes ready on a target the world does not hold live.
-    pub(crate) fn command(
+    pub(crate) fn start_own(
+        &mut self,
         step: &mut Step<'_>,
         unit: &mut Unit,
-        cmd: &AttackCommand<'_>,
+        head: HeadStart,
+        start: &OwnStart<'_>,
         roles: &Roles,
-    ) -> GenieResult<(Self, Vec<Posted>)> {
+    ) -> GenieResult<Vec<Posted>> {
+        // the start clears +0x900 before its slot 0x68, which the caller ran: the sprite reads no
+        // attack count
+        match head {
+            HeadStart::Added => {
+                step.world.parts.combat_mut(unit.id)?.attack_count = AttackCount::ZERO;
+            }
+            HeadStart::Restarted => {}
+        }
         let reads = unit.move_to_reads(
             step.world.top_speed(step.player, unit)?,
             MasterTables::new(&step.world.model.masters, &step.world.parts.own_master),
@@ -249,21 +259,22 @@ impl Attack {
             },
         );
         let mover = mover.ok_or(ATTACKER_UNMOVING)?;
-        let (mut attack, begun, mut posted) =
-            Self::own_start(cmd, (&step.world.spatial, by_id), mover, &reads)?;
+        let (begun, mut posted) =
+            self.begin_own(start, &step.world.spatial, by_id, mover, &reads)?;
         if begun.failed_first() {
             step.world.parts.set_anim_speed(unit.id, Speed::new(1.0));
         }
         if begun == Begun::Failed {
-            attack.fail_at_start(
-                &mut unit.sprite,
+            self.finish_in(
+                AttackState::Failed,
+                unit,
                 step.world.parts.motion_mut(unit.id),
                 step.world.streams.get_mut(Stream::Sprite),
                 step.world.model.tuning.sprite,
             )?;
         }
         if begun == Begun::Ready {
-            let ready = cmd.ready.as_ref().ok_or(ATTACK_TARGET_NOT_LIVE)?;
+            let ready = start.ready.as_ref().ok_or(ATTACK_TARGET_NOT_LIVE)?;
             let (motion, by_id) = step.world.parts.lend_motion(
                 unit.id,
                 BesideParts {
@@ -282,7 +293,7 @@ impl Attack {
                 by_id,
                 motion,
             };
-            attack.enter_ready(unit, &mut ground, &ready.fight, &ready.reads)?;
+            self.enter_ready(unit, &mut ground, &ready.fight, &ready.reads)?;
         }
         if begun.start() == MoveStart::Arrived {
             unit.shows_standing_sprite(
@@ -296,44 +307,52 @@ impl Attack {
                 step.world.model.tuning.sprite,
             )?;
         }
-        Ok((attack, posted))
+        Ok(posted)
     }
 
-    /// The start (slot 5 with 1, `0x140a7f8c0`) after its unit AI and place test, its `+0x900`
-    /// and its standing sprite (the caller's): readyToAttack (`FUN_140a7f9d0`, third argument 0),
+    /// The start (slot 0x28, `0x140a7f8c0`) after its unit AI and place test, its `+0x900` and
+    /// its standing sprite (the caller's): readyToAttack (`FUN_140a7f9d0`, third argument 0),
     /// then a unit with a top speed (slot 0x208, `UCOMISS`: a NaN one has some) whose unit AI may
     /// move to attack (slot 0x1d0) turns to state 4 (`set_state(4)`: a `MoveTo` to the target, the
     /// old one's teardown stopping the unit); any other goes ready (`set_state(6)`,
     /// [`Begun::Ready`]) when readyToAttack reached its ready end (its second argument 1), else
-    /// fails (`set_state(13)`, [`Begun::Failed`]).
+    /// fails (`set_state(13)`, [`Begun::Failed`]). readyToAttack answers only 0 or 1, so the
+    /// start's `set_state(13)` on an answer 2 is never reached.
     ///
-    /// readyToAttack at the start: a target of a player (`target_owner` above 0) out of the
-    /// player's sight (`visible` false: its slot 0x1e0 neither 0xf nor 0x80 with its master's fog
-    /// flag) makes a unit of stance 0 with a speed above 0 (`COMISS`/`JBE`: not a NaN one) whose unit AI
-    /// may move to attack go where it was seen (`set_state(5)`: a `MoveTo` to that point, which has
-    /// no target, so `f32::MAX` from it at its start: state 3), any other fails
-    /// ([`Begun::failed_first`]). The constructor's point (−1 on each axis) is never the target's
-    /// place, nor within half a tile of it, so no ready-at-once test passes and the reach
-    /// decides, by the gap (`FUN_14118f680`): below the least range (`COMISS`/`JA`) a unit's own
-    /// Attack posts 0x1fe (−1, −1, −1) and a unit that may not move fails; beyond the reach (the
-    /// range, half a tile more up to [`NO_RANGE`]; `COMISS`/`JBE`: a NaN gap is within) it posts
-    /// 0x1fd, then stance 1's leash fails a target `AttackTuning::leash_slack` past the range from the unit
-    /// AI's `state_position` (`FUN_14099ef70`'s root, `COMISS`/`JNC`: a NaN distance holds), a unit
+    /// readyToAttack at the start, on what `sight` holds: a target of a player (`target_owner`
+    /// above 0) out of the player's sight (`visible` false: its slot 0x1e0 neither 0xf nor 0x80
+    /// with its master's fog flag) makes a unit of stance 0 with a speed above 0 (`COMISS`/`JBE`:
+    /// not a NaN one) whose unit AI may move to attack go where it was seen (`set_state(5)`: a
+    /// `MoveTo` to that point, which has no target, so `f32::MAX` from it at its start: state 3),
+    /// any other fails ([`Begun::failed_first`]). A target on the Attack's point, or within half
+    /// a tile of it with a unit whose master moves, a volley under way or the target in range, is
+    /// ready at once ([`Attack::ready_at_once`]): the constructor's point (−1 on each axis) is
+    /// never so, an Attack that restarts can be. Else the reach decides, by the gap
+    /// (`FUN_14118f680`): below the least range (`COMISS`/`JA`) a unit's own Attack posts 0x1fe
+    /// (−1, −1, −1) and a unit that may not move fails; beyond the reach (the range, half a tile
+    /// more up to [`NO_RANGE`]; `COMISS`/`JBE`: a NaN gap is within) it posts 0x1fd, then stance
+    /// 1's leash fails a target `AttackTuning::leash_slack` past the range from the unit AI's
+    /// `state_position` (`FUN_14099ef70`'s root, `COMISS`/`JNC`: a NaN distance holds), a unit
     /// that may move turns to state 4, any other fails. The reach is to `reach_gap`, a gate's
     /// nearest of it and its first two parts ([`crate::movement::gate_gap`]). Within it the
-    /// target's place becomes the point and the unit faces it (`FUN_141162db0`, but masters 1704
-    /// and 1706): its ready end.
+    /// target's place becomes the point. At the ready end the unit faces the target
+    /// ([`face_at_start`]).
     ///
     /// [`NO_RANGE`]: crate::combat::attack::NO_RANGE
     pub(super) fn begin(
         &mut self,
-        (engagement, reach_gap): (&Engagement, Distance),
-        (visible, target_owner): (bool, PlayerId),
+        sight: BeginReads<'_>,
         mover: &mut Mover,
-        posted: &mut Vec<(NotifyKind, [i32; 3])>,
+        posted: &mut Vec<Posted>,
         reads: &MoveToReads<'_>,
         layer: BeginLayer<'_>,
     ) -> GenieResult<Begun> {
+        let BeginReads {
+            engagement,
+            reach_gap,
+            visible,
+            target_owner,
+        } = sight;
         let BeginLayer {
             roles,
             attack_tuning,
@@ -357,6 +376,13 @@ impl Attack {
             } else {
                 failed_first = true;
             }
+        } else if self.ready_at_once(
+            engagement.target_position,
+            self.near(engagement.gap, attack_tuning),
+            engagement.moves || engagement.next_volley != MissileCount::ZERO,
+        ) {
+            face_at_start(engagement, mover, roles)?;
+            ready_end = true;
         } else if self.min_range > engagement.gap {
             if self.voice.is_loud() {
                 posted.push((NotifyKind::TOO_CLOSE, [-1; 3]));
@@ -380,17 +406,7 @@ impl Attack {
             }
         } else {
             self.point = engagement.target_position;
-            if !roles
-                .of_master(engagement.master)
-                .contains(MasterRoles::UNTURNED_ATTACKER)
-            {
-                let _ = face_target(
-                    mover,
-                    engagement.position,
-                    engagement.target_position,
-                    engagement.world_time,
-                )?;
-            }
+            face_at_start(engagement, mover, roles)?;
             ready_end = true;
         }
         if movable {
@@ -420,10 +436,10 @@ impl Attack {
         sqrt(dy * dy + dx * dx) >= (self.range + Distance::new(attack_tuning.leash_slack)).get()
     }
 
-    /// The start's `set_state(13)` for a unit that cannot move out of reach of its target
-    /// ([`Attack::command`]), as [`Attack::finish_in`]: the state, the unit's animation at speed
-    /// 1 and its standing sprite (a unit that cannot move has no `MoveTo` to stop). Its next update
-    /// posts 0x1f9 and removes it.
+    /// The start's `set_state(13)` of a new Attack of a unit inside another (the attack command's,
+    /// [`crate::unit_ai::world_view::UnitView::start_attack_now`]), as [`Attack::finish_in`]: the
+    /// state, the unit's animation at speed 1 and its standing sprite (a new Attack holds no
+    /// `MoveTo` to stop). Its next update posts 0x1f9 and removes it.
     ///
     /// # Errors
     ///
@@ -443,7 +459,7 @@ impl Attack {
         Ok(())
     }
 
-    /// The start's `set_state(6)` for a unit that cannot move ([`Attack::command`]): the range
+    /// The start's `set_state(6)` for a unit that cannot move ([`Attack::start_own`]): the range
     /// test again, and the swing when it is ready, on the world's parts `ground`.
     ///
     /// # Errors
@@ -458,6 +474,25 @@ impl Attack {
     ) -> GenieResult<()> {
         self.ready(unit, ground, fight, attack_reads)
     }
+}
+
+/// readyToAttack's ready end at the start (`0x140a801f2`): the unit with its mover `mover` faces
+/// its target (`FUN_141162db0`, [`face_target`]), but for masters 1704 and 1706. Whether it faces
+/// it and its attack timer (slot 0x100) make readyToAttack's answer, which the start does not
+/// read.
+fn face_at_start(engagement: &Engagement, mover: &mut Mover, roles: &Roles) -> GenieResult<()> {
+    if !roles
+        .of_master(engagement.master)
+        .contains(MasterRoles::UNTURNED_ATTACKER)
+    {
+        let _ = face_target(
+            mover,
+            engagement.position,
+            engagement.target_position,
+            engagement.world_time,
+        )?;
+    }
+    Ok(())
 }
 
 /// The Attack constructor's sprites and frames (`FUN_140a7c210`) for a unit that shows its
@@ -540,8 +575,8 @@ impl Arms {
     }
 }
 
-/// What an Attack of a unit (its unit AI, top speed and master, placed at `me`) reads of it and
-/// its target (placed at `them`).
+/// What an Attack of a unit (its unit AI, top speed and master, placed at `me`, the volley under
+/// way `next_volley`) reads of it and its target (placed at `them`).
 pub fn engagement(
     ai: Option<&UnitAi>,
     speed: Speed,
@@ -549,6 +584,7 @@ pub fn engagement(
     me: &Placed,
     them: &Placed,
     world_time: WorldTime,
+    next_volley: MissileCount,
 ) -> GenieResult<Engagement> {
     if master.creatable_part().charge_kind.ranged() {
         return Err(CHARGE_RANGE);
@@ -568,5 +604,7 @@ pub fn engagement(
         master: master.id,
         target_class: them.class,
         same_owner: me.player == them.player,
+        moves: master.moves(),
+        next_volley,
     })
 }

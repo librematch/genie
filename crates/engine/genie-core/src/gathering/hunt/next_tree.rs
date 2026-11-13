@@ -140,6 +140,7 @@ impl Unit {
             me_at,
             them,
             step.world.world_time,
+            step.world.parts.combat_of(self.id).next_volley,
         )?;
         let walks = self.move_walks(
             step.world.parts.mover_of(self.id),

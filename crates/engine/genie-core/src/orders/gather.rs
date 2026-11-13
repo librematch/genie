@@ -481,6 +481,7 @@ impl World {
             me,
             them,
             self.world_time,
+            self.parts.combat_of(unit.id).next_volley,
         )
     }
 }

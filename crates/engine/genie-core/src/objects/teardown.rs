@@ -223,6 +223,16 @@ pub(crate) enum NextHead {
     Stays,
 }
 
+/// Slot 0x28's argument (`first_in_stack`): how an action came to the head of its list, which
+/// its start reads (the Attack's, `0x140a7f8c0`, clears its unit's attack count only when added).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum HeadStart {
+    /// 1: the list's add (`FUN_140a977e0`) put it there new.
+    Added,
+    /// 0: a deletion of the head left it there ([`NextHead::Restarts`], [`Unit::restart_head`]).
+    Restarted,
+}
+
 /// The head's slot 0x28 with 0 of a kind whose restart is not ported yet ([`Unit::restart_head`]).
 pub(crate) const NEXT_HEAD: &str = "a deleted head with a second action under it (slot 0x28)";
 
@@ -304,7 +314,9 @@ impl Unit {
     /// on its target ([`Unit::restart_enter`]). A Hunt (`0x140ac49b0`) takes the task's load from
     /// a target that holds something and searches ([`Unit::hunt_begin_search`]); a Gather
     /// (`0x140a8b3a0`) takes it, then walks off a farm that others work too or searches
-    /// ([`Unit::restart_gather`]). Nothing for an empty list.
+    /// ([`Unit::restart_gather`]). A unit's own Attack (`0x140a7f8c0`) fails without a unit AI
+    /// or inside an object, else starts again as the list's add starts it but for the attack
+    /// count's clear ([`Unit::restart_attack`]). Nothing for an empty list.
     ///
     /// [`MakeAction::first`]: crate::gathering::make::MakeAction::first
     /// [`MissileAction::restart`]: crate::combat::missile::MissileAction::restart
@@ -312,7 +324,8 @@ impl Unit {
     /// # Errors
     ///
     /// An owner the world lacks, the Explore's, the Transport's, the `MoveTo`'s, the Enter's,
-    /// the Hunt's and the Gather's, and the restart of any other kind, which is not ported.
+    /// the Hunt's, the Gather's and the Attack's, and the restart of any other kind, which is not
+    /// ported.
     pub(crate) fn restart_head(
         &mut self,
         actions: &mut LayersAction,
@@ -341,6 +354,7 @@ impl Unit {
             Some(Action::Enter(_)) => self.restart_enter(actions, step),
             Some(&mut Action::Hunt(hunt)) => self.hunt_begin_search(hunt, actions, step),
             Some(&mut Action::Gather(gather)) => self.restart_gather(gather, actions, step),
+            Some(&mut Action::Attack(attack)) => self.restart_attack(attack, actions, step),
             Some(head) => Err(GenieError::unreachable(NEXT_HEAD).with("kind", head.kind())),
         }
     }

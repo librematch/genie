@@ -251,6 +251,7 @@ impl Unit {
             me_at,
             them,
             step.world.world_time,
+            step.world.parts.combat_of(self.id).next_volley,
         )?;
         let moving = action.task.walk_sprite_id(self.life.held());
         let arms = arms(

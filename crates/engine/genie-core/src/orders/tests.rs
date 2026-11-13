@@ -1070,7 +1070,7 @@ fn annexed(world: &mut World) {
 /// [`soldiers`]' soldier 11 (master 4, melee, reload 2) at (10, 10) on its feet with a walker
 /// of speed 1.2 and a unit AI of `stance`, touching Gaia's wolf 50 (master 126, class 10, 25
 /// hit points) at (10.4, 10), and the attack task (action type 7, no sprites of its own).
-fn work_attack(stance: UnitStance) -> (World, Task) {
+pub(crate) fn work_attack(stance: UnitStance) -> (World, Task) {
     use crate::map::spatial::Placed;
     use crate::math::rng::Well512;
     use crate::objects::sprite::Graphic;

@@ -33,10 +33,11 @@ The damage of the hit is in `combat/damage/`.
 | File | What it holds |
 | --- | --- |
 | [`attack_state.rs`](attack_state.rs) | An Attack's state: the steps of its update between the start and the end, each walk with its `MoveTo`. |
-| [`constructor.rs`](constructor.rs) | The Attack's constructor (`FUN_140a7c210`) and its start (slot 5): its sprites and frames and what it reads of its unit and its target. |
+| [`constructor.rs`](constructor.rs) | The Attack's constructor (`FUN_140a7c210`) and its start (slot 5, `0x140a7f8c0`): its sprites and frames and what it reads of its unit and its target. |
 | [`hits.rs`](hits.rs) | A hit: where it comes from (`Hit`), what the swing does after it, the strike (`FUN_141084230`) and the blast so far. |
 | [`mod.rs`](mod.rs) | The Attack action (`RGE_Action_Attack`, type 9, vtable `0x142ed47a8`) of a melee unit: a hunting villager's sub-action on a tree or on its livestock (`crate::gathering::hunt`). |
 | [`ready_to_attack.rs`](ready_to_attack.rs) | readyToAttack (`FUN_140a7f9d0`): the ready state, the follow, the range and sight tests and the facing at its end. |
+| [`restart.rs`](restart.rs) | The Attack's restart under a deleted head (slot 0x28 with 0, `0x140a7f8c0`): its unit AI and place test, the sprite it stands with, then the start as the list's add runs it. |
 | [`sprites.rs`](sprites.rs) | The swing's and the arrival's sprites, the attack timer and the unit's turn to its target. |
 | [`states.rs`](states.rs) | The Attack's `set_state` (`0x140a820c0`): the move, the teardown and prelude, a lost target, one out of sight, the finish and the halt. |
 | [`tests.rs`](tests.rs) | Tests. |
@@ -46,6 +47,7 @@ The damage of the hit is in `combat/damage/`.
 | [`walk_and_swing.rs`](walk_and_swing.rs) | State 4's walk to the target and state 7's swing with its hit and its trample. |
 | [`walks.rs`](walks.rs) | The `MoveTo`s the Attack's `set_state` makes (`0x140a820c0`, cases 4, 5 and 11) and the update of its sub-action list (`FUN_140a992b0`). |
 | [`work_slots.rs`](work_slots.rs) | The swing's state (7), slot 9 (`RGE_Action_Attack::work`) and slot 0x68 (`set_target_obj`). |
+| [`restart/`](restart/) | The Attack's restart's tests. |
 <!-- /files -->
 
 ## How it connects

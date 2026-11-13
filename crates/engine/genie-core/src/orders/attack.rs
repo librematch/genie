@@ -6,7 +6,6 @@ use crate::construction::MainBuildingId;
 use crate::gathering::hunt::HuntRetarget;
 use crate::map::Distance;
 use crate::map::Position;
-use crate::map::Tile;
 use crate::math::rng::Stream;
 use crate::movement::MoveStart;
 use crate::objects::ListIndex;
@@ -16,17 +15,20 @@ use crate::objects::actions::LAST_TAKEN;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::MasterKind;
+use crate::objects::teardown::HeadStart;
 use crate::players::PlayerId;
 use crate::unit_ai::Notifies;
 use crate::world::WorldTime;
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
+use crate::combat::AttackTargetId;
 use crate::combat::attack::AttackSource;
-use crate::combat::attack::{AttackCommand, ReadyReads, arms, engagement, show_arrived};
+use crate::combat::attack::{
+    OwnStart, ReadyReads, arms, engagement, show_arrived, target_in_sight,
+};
 use crate::combat::victims::victim_of;
 use crate::combat::victims::{ChargeOf, VictimLayers, VictimView};
-use crate::combat::{AttackCount, AttackTargetId};
 use crate::gathering::HuntTargetId;
 use crate::gathering::gather::unit::WalkSprites;
 use crate::gathering::hunt::HUNTER_STATE_LACKING;
@@ -104,8 +106,8 @@ impl World {
     /// the task's sprites, the task's range or slot 0x238's for 0) takes its target (slot 0x178);
     /// the notify (`FUN_14106e4e0` kind 9: the last retarget time `+0xbc` takes the world's time,
     /// then order 700, action 600, the target with its class and the work's point); the install
-    /// clears the action list and starts the Attack (slot 5, `0x140a7f8c0`: `+0x900` cleared, the
-    /// standing sprite, the range test of [`Attack::command`]; a unit that cannot move in reach
+    /// clears the action list and starts the Attack (slot 5, `0x140a7f8c0` with 1: `+0x900`
+    /// cleared, the standing sprite, the range test of [`Attack::start_own`]; a unit that cannot move in reach
     /// goes ready, `set_state(6)`, [`Attack::enter_ready`]; one that may move ends in
     /// `set_state(4)`, whose `MoveTo` starting arrived shows the standing sprite at its speed and
     /// clears `+0x7b8`, `0x140aa29e0`); then the Attack takes the target as
@@ -147,19 +149,18 @@ impl World {
             .get(self.players.live(player, idx)?.id)
             .ok_or(ATTACKER_UNPLACED)?;
         let target_at = *self.spatial.get_known(target)?.ok_or(TARGET_UNPLACED)?;
-        let (tx, ty) = (target_at.position.x() as i32, target_at.position.y() as i32);
-        let visible = self.spatial.sees_tile(player, Tile::new(tx, ty))
-            || (aim.fog_visibility != FogVisibility::INVISIBLE
-                && self.spatial.explored(player, Tile::new(tx, ty))?);
+        let visible = target_in_sight(&self.spatial, player, &target_at, aim.fog_visibility)?;
         let ready = self.attack_ready(player, idx, target, (master, world_time))?;
-        let speed = self.top_speed(player, self.players.live(player, idx)?)?;
+        let attacker = self.players.live(player, idx)?;
+        let speed = self.top_speed(player, attacker)?;
         let engagement = engagement(
-            self.parts.unit_ai.get(self.players.live(player, idx)?.id),
+            self.parts.unit_ai.get(attacker.id),
             speed,
             master,
             &me_at,
             &target_at,
             world_time,
+            self.parts.combat_of(attacker.id).next_volley,
         )?;
         let unit = self.players.live_mut(player, idx)?;
         if unit.sprite.is_none() {
@@ -169,7 +170,6 @@ impl World {
             .with("object", unit.id)
             .with("master", unit.life.master_id));
         }
-        self.parts.combat_mut(unit.id)?.attack_count = AttackCount::ZERO;
         new_sprite(
             &mut unit.sprite,
             self.parts.move_stats_mut(unit.id),
@@ -177,30 +177,31 @@ impl World {
             self.streams.get_mut(Stream::Sprite),
             self.model.tuning.sprite,
         );
-        let cmd = AttackCommand {
+        let start = OwnStart {
             target,
             engagement: &engagement,
-            arms,
             visible,
             target_owner: aim.owner,
             ready,
         };
-        self.install_attack(player, idx, target, &cmd)
+        self.install_attack(player, idx, Attack::own(target, &engagement, arms), &start)
     }
 
-    /// The Attack's start on object `idx` of `player` ([`Attack::command`] with `cmd`): the
-    /// start's notifies go to the unit AI, the Attack takes `target` as its second target too
-    /// (`FUN_140a7a190`) and goes on the action list, and the unit takes the target (slot 0x178).
+    /// The new `attack`'s start on object `idx` of `player` ([`Attack::start_own`] with 1 and
+    /// `start`): the start's notifies go to the unit AI, the Attack takes its target as its second
+    /// target too (`FUN_140a7a190`) and goes on the action list, and the unit takes the target
+    /// (slot 0x178).
     fn install_attack(
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        target: ObjectId,
-        cmd: &AttackCommand<'_>,
+        mut attack: Attack,
+        start: &OwnStart<'_>,
     ) -> GenieResult<()> {
         let roles = self.model.roles.clone();
-        let (mut attack, posted) = self.run_on_step(player, idx, |unit, _, step| {
-            Attack::command(step, unit, cmd, &roles)
+        let target = start.target;
+        let posted = self.run_on_step(player, idx, |unit, _, step| {
+            attack.start_own(step, unit, HeadStart::Added, start, &roles)
         })?;
         // the start's notifies go to the unit AI (the unit's slot 0x328 -> the AI's slot 0x38)
         let unit = self.players.live_mut(player, idx)?;

@@ -49,6 +49,7 @@ mod attack_state;
 mod constructor;
 mod hits;
 mod ready_to_attack;
+mod restart;
 mod sprites;
 mod states;
 mod unit;
@@ -67,6 +68,7 @@ pub(crate) use self::hits::{Hit, strike};
 pub use self::ready_to_attack::AtOnce;
 #[cfg(test)]
 use self::ready_to_attack::in_range;
+pub(crate) use self::ready_to_attack::target_in_sight;
 #[cfg(test)]
 use self::sprites::SpriteReset;
 pub(crate) use self::sprites::{Aim, face_target, reset_sprite, show_arrived};
@@ -188,18 +190,16 @@ pub struct Attack {
 /// A notify an Attack's start posts to its unit's AI: its kind and three parameters.
 pub(crate) type Posted = (NotifyKind, [i32; 3]);
 
-/// A unit's own Attack command ([`Attack::command`]): its target, what it engages and with
-/// which arms, the target's sight and owner, and what the start's `set_state(6)` reads.
+/// What the start of a unit's own Attack reads ([`Attack::start_own`]: the attack command's, the
+/// attack task's, a deletion's restart): its target, what it engages, the target's sight and
+/// owner, and what the start's `set_state(6)` reads.
 #[derive(Clone, Debug)]
-pub(crate) struct AttackCommand<'world> {
+pub(crate) struct OwnStart<'world> {
     /// The target.
     pub(crate) target: ObjectId,
     /// What the Attack reads of its unit and its target as it starts.
     pub(crate) engagement: &'world Engagement,
-    /// Its sprites, missile and frames.
-    pub(crate) arms: Arms,
-    /// The target is in the unit's player's sight (its slot 0x1e0 0xf, or 0x80 with its
-    /// master's fog flag).
+    /// The target is in the unit's player's sight ([`target_in_sight`]).
     pub(crate) visible: bool,
     /// The target's owner.
     pub(crate) target_owner: PlayerId,
@@ -218,8 +218,23 @@ pub(crate) struct ReadyReads {
     pub(crate) fight: Fight,
 }
 
+/// What readyToAttack reads at the start ([`Attack::begin`]) besides the unit's mover: what the
+/// Attack engages, the gap its reach is to (the target's, a gate's nearest of it and its first two
+/// parts, [`crate::movement::gate_gap`]), and the target's sight and owner.
+#[derive(Clone, Copy, Debug)]
+struct BeginReads<'reads> {
+    /// What the Attack reads of its unit and its target as it starts.
+    engagement: &'reads Engagement,
+    /// The gap the reach is to.
+    reach_gap: Distance,
+    /// The target is in the unit's player's sight ([`target_in_sight`]).
+    visible: bool,
+    /// The target's owner.
+    target_owner: PlayerId,
+}
+
 /// readyToAttack's answer to the start ([`Attack::begin`]), which the start's end follows
-/// ([`Attack::command`]).
+/// ([`Attack::start_own`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Begun {
     /// The unit can move: its `MoveTo` started.
@@ -287,6 +302,12 @@ pub struct Engagement {
     pub(crate) target_class: ClassId,
     /// The target is the unit's player's (the constructor's `+0x9f`, [`Attack::same_owner`]).
     pub(crate) same_owner: bool,
+    /// The unit's master moves (`FUN_140fdd080`, [`Master::moves`]), which readyToAttack's
+    /// ready-at-once test reads.
+    pub(crate) moves: bool,
+    /// `next_volley` (`+0xa04`): the missiles of the volley under way already fired, which
+    /// readyToAttack's ready-at-once test reads (`FUN_1412161a0`).
+    pub(crate) next_volley: MissileCount,
 }
 
 bitflags::bitflags! {

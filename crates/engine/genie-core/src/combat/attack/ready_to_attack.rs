@@ -33,6 +33,7 @@ use crate::world::ATTACKER_UNMOVING;
 use crate::world::Seconds;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::AttackTuning;
 use crate::world::layer::generated::SpriteTuning;
 
 /// Whether readyToAttack (`FUN_140a7f9d0`'s third argument) tests the ready-at-once case.
@@ -187,11 +188,7 @@ impl Attack {
             .map(|mover| mover.stats.radius.ground())
             .ok_or(ATTACKER_UNMOVING)?;
         let gap = footprint_gap(at, ground, placed.position, placed.radius);
-        let near = if self.range <= Distance::new(NO_RANGE) {
-            gap + Distance::new(attack_tuning.short_range_gap)
-        } else {
-            gap
-        };
+        let near = self.near(gap, attack_tuning);
         let mobile = MasterKind::MOVING <= fight.own.kind && Speed::ZERO < speed;
         if at_once == AtOnce::Tested
             && self.ready_at_once(
@@ -277,6 +274,16 @@ impl Attack {
         Ok((target.id(), *placed))
     }
 
+    /// readyToAttack's gap `gap` for its ready-at-once range test: half a tile less
+    /// (`AttackTuning::short_range_gap`) for a range up to [`NO_RANGE`].
+    pub(super) fn near(&self, gap: Distance, attack_tuning: &AttackTuning) -> Distance {
+        if self.range <= Distance::new(NO_RANGE) {
+            gap + Distance::new(attack_tuning.short_range_gap)
+        } else {
+            gap
+        }
+    }
+
     /// readyToAttack's ready-at-once test: the target stands on the attack's point
     /// (`FUN_140a7bbf0`), or within half a tile of it on each axis (`FUN_140a7bd10`: a NaN
     /// difference is not within) and either `moves_or_volleys` (a unit that moves, or a volley
@@ -354,17 +361,31 @@ pub(super) fn in_range(near: Distance, range: Distance, min_range: Distance) -> 
             || at_most_or_unordered(min_range.get(), near.get()))
 }
 
-/// readyToAttack's sight test: a target of a player (not Gaia) whose tile the unit's player does
-/// not see (its slot 0x1e0 neither 0xf) nor has explored while the target's master shows in the
-/// fog (0x80 with its fog flag).
+/// readyToAttack's sight test: a target of a player (not Gaia) out of the unit's player's sight
+/// ([`target_in_sight`]).
 ///
 /// # Errors
 ///
 /// A tile the map's sight does not hold.
 pub(super) fn target_unseen(world: &Spatial, fight: &Fight, placed: &Placed) -> GenieResult<bool> {
-    let (tx, ty) = (placed.position.x() as i32, placed.position.y() as i32);
     Ok(placed.player != PlayerId::GAIA
-        && !world.sees_tile(fight.own.player, Tile::new(tx, ty))
-        && !(fight.victim.fog_visibility != FogVisibility::INVISIBLE
-            && world.explored(fight.own.player, Tile::new(tx, ty))?))
+        && !target_in_sight(world, fight.own.player, placed, fight.victim.fog_visibility)?)
+}
+
+/// readyToAttack's sight of a target at `placed`, its master's fog visibility `fog`: `player` sees
+/// its tile (the target's slot 0x1e0 answers 0xf), or has explored it while the master shows in
+/// the fog (0x80 with its fog flag).
+///
+/// # Errors
+///
+/// A tile the map's sight does not hold.
+pub(crate) fn target_in_sight(
+    world: &Spatial,
+    player: PlayerId,
+    placed: &Placed,
+    fog: FogVisibility,
+) -> GenieResult<bool> {
+    let (tx, ty) = (placed.position.x() as i32, placed.position.y() as i32);
+    Ok(world.sees_tile(player, Tile::new(tx, ty))
+        || (fog != FogVisibility::INVISIBLE && world.explored(player, Tile::new(tx, ty))?))
 }

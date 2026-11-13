@@ -650,4 +650,4 @@ pub(crate) fn nearest_table_site(
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

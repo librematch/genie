@@ -1,5 +1,6 @@
 use super::*;
 use crate::GenieResult;
+use crate::combat::MissileCount;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::AttackerFlags;
 use crate::combat::attack::BeginLayer;
@@ -366,6 +367,8 @@ fn engagement() -> Engagement {
         master: ids::VILLAGER_MALE,
         target_class: class::TREE,
         same_owner: false,
+        moves: true,
+        next_volley: MissileCount::ZERO,
     }
 }
 
