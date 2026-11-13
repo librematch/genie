@@ -44,7 +44,7 @@ impl RepairAction {
             RepairState::Work => {
                 show(step, repairer, self.task.sprites.proceeding, reads.standing)?;
                 if let Some(counted) = reads.counted_object() {
-                    Self::count(step, Some(counted), 1)?;
+                    Self::count(step, counted, 1)?;
                     self.counted = true;
                 }
             }

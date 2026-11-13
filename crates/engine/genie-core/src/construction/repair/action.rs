@@ -515,16 +515,14 @@ impl RepairAction {
     }
 
     /// The repairers of `counted`, the object `FUN_140ad9050` counts them in (`+0x9e8`), change
-    /// by `by` at once; nothing without one, or once the world no longer holds it.
+    /// by `by` at once; nothing once the world no longer holds it.
     ///
     /// # Errors
     ///
     /// None (an unreachable error where a table lost the part it took).
-    fn count(step: &mut Step<'_>, counted: Option<ObjectId>, by: i8) -> GenieResult<()> {
-        if let Some(id) = counted
-            && step.world.object(id).is_some()
-        {
-            let builder_count = step.world.parts.repairers_mut(id)?;
+    fn count(step: &mut Step<'_>, counted: ObjectId, by: i8) -> GenieResult<()> {
+        if step.world.object(counted).is_some() {
+            let builder_count = step.world.parts.repairers_mut(counted)?;
             *builder_count = builder_count.changed_by(by);
         }
         Ok(())
@@ -539,10 +537,12 @@ impl RepairAction {
         repairer: &mut Unit,
         counted: Option<ObjectId>,
     ) -> GenieResult<()> {
-        if self.counted {
+        if self.counted
+            && let Some(counted) = counted
+        {
             Self::count(step, counted, -1)?;
-            self.counted = false;
         }
+        self.counted = false;
         let target = self.target.take();
         if target.is_some() {
             let by = repairer.releaser(step)?;
@@ -605,10 +605,12 @@ impl RepairAction {
         repairer: &Unit,
         counted: Option<ObjectId>,
     ) -> GenieResult<()> {
-        if self.counted {
+        if self.counted
+            && let Some(counted) = counted
+        {
             Self::count(step, counted, -1)?;
-            self.counted = false;
         }
+        self.counted = false;
         if self.state.take_move_to().is_some()
             && let Some(mover) = step.world.parts.mover_mut(repairer.id)
         {
