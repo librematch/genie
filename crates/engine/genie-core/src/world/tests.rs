@@ -14577,8 +14577,8 @@ fn each_destructor_reads_the_top_speed_the_restarts_before_it_left() {
 /// The unit's stop (slot 0x3c0, `FUN_14108c160`): its list goes, then a unit alive (state 2)
 /// shows slot 0x798's sprite. A TRIBE combat object's (type 70, `FUN_1412029f0`) is its terrain
 /// look's standing sprite where it has one (the top speed that sprite's, 1.6 off the base 0.8),
-/// else its master's (none here: the base); an RGE combat object's (type 50, `FUN_141188900`) is
-/// its master's whatever look it holds. A unit in state 3 shows none: its walking 1.3 stays.
+/// else its master's (`+0x470`: 1.2); an RGE combat object's (type 50, `FUN_141188900`) is its
+/// master's whatever look it holds. A unit in state 3 shows none: its walking 1.3 stays.
 #[test]
 fn stop_of_alive_unit_shows_its_terrain_look_or_master_standing_sprite() {
     let looked = Graphic {
@@ -14590,12 +14590,17 @@ fn stop_of_alive_unit_shows_its_terrain_look_or_master_standing_sprite() {
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
     };
+    let mastered = Graphic {
+        id: SpriteId::named(78),
+        speed_multiplier: SpeedMultiplier::of_data(1.5),
+        ..looked
+    };
     for (kind, look, state, speed) in [
         (
             MasterKind::COMBAT,
             None,
             ObjectState::Alive,
-            Speed::new(0.8),
+            Speed::new(1.2),
         ),
         (
             MasterKind::COMBAT,
@@ -14607,7 +14612,7 @@ fn stop_of_alive_unit_shows_its_terrain_look_or_master_standing_sprite() {
             MasterKind::RGE_COMBAT,
             Some(SpriteId::named(77)),
             ObjectState::Alive,
-            Speed::new(0.8),
+            Speed::new(1.2),
         ),
         (
             MasterKind::COMBAT,
@@ -14621,13 +14626,19 @@ fn stop_of_alive_unit_shows_its_terrain_look_or_master_standing_sprite() {
         for masters in &mut world.model.masters {
             *masters = Arc::new(Masters::new(masters.iter().cloned().map(|master| {
                 if master.id == VILLAGER_MALE {
-                    Master { kind, ..master }
+                    Master {
+                        kind,
+                        standing_sprite: Some(SpriteId::named(78)),
+                        ..master
+                    }
                 } else {
                     master
                 }
             })));
         }
-        let _ = Arc::make_mut(&mut world.model.graphics).insert(SpriteId::named(77), looked);
+        let graphics = Arc::make_mut(&mut world.model.graphics);
+        let _ = graphics.insert(SpriteId::named(77), looked);
+        let _ = graphics.insert(SpriteId::named(78), mastered);
         world
             .parts
             .combat_mut(object_id(40))
