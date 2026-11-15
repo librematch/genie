@@ -19,6 +19,7 @@ use crate::construction::housing::HousingAction;
 use crate::construction::pack::PackAction;
 use crate::construction::repair::REPAIR;
 use crate::construction::repair::RepairAction;
+use crate::construction::unpack::UnpackAction;
 use crate::construction::wait_solidify::WAIT_SOLIDIFY;
 use crate::construction::wait_solidify::WaitSolidify;
 use crate::garrison::ENTER;
@@ -146,6 +147,8 @@ action_kinds! {
     Housing(HousingAction) => housing, housing_mut, take_housing, set_housing, with_housing;
     /// A building's Pack ([`crate::construction::pack`]).
     Pack(PackAction) => pack, pack_mut, take_pack, set_pack, with_pack;
+    /// A building's Unpack ([`crate::construction::unpack`]).
+    Unpack(UnpackAction) => unpack, unpack_mut, take_unpack, set_unpack, with_unpack;
 }
 
 impl Action {
@@ -169,6 +172,7 @@ impl Action {
             Self::WaitSolidify(_) => WAIT_SOLIDIFY,
             Self::Housing(_) => ActionKind::HOUSING,
             Self::Pack(_) => ActionKind::PACK,
+            Self::Unpack(_) => ActionKind::UNPACK,
         }
     }
 
@@ -192,6 +196,7 @@ impl Action {
             Self::WaitSolidify(wait_solidify) => wait_solidify.state.get(),
             Self::Housing(housing_action) => housing_action.state.get(),
             Self::Pack(pack_action) => pack_action.state.get(),
+            Self::Unpack(unpack_action) => unpack_action.state.get(),
         })
     }
 }
@@ -229,6 +234,7 @@ impl Action {
             Self::Enter(enter_action) => enter_action.target.map(RoleId::id),
             Self::Missile(missile_action) => missile_action.target.map(RoleId::id),
             Self::Pack(pack_action) => pack_action.target,
+            Self::Unpack(unpack_action) => unpack_action.target,
             Self::Fly(_)
             | Self::Explore(_)
             | Self::Transport(_)
@@ -276,6 +282,7 @@ impl Action {
             Self::Gather(gather_action) => sub_walk(gather_action.state.walk_mut()),
             Self::Enter(enter_action) => sub_walk(enter_action.state.walk_mut()),
             Self::Transport(transport_action) => sub_walk(transport_action.state.walk_mut()),
+            Self::Unpack(unpack_action) => sub_walk(unpack_action.state.walk_mut()),
             Self::Hunt(hunt_action) => match &mut hunt_action.state {
                 HuntState::Attack { attack } => attack.as_mut().map(SubActionMut::Attack),
                 walking => sub_walk(walking.walk_mut()),
@@ -359,6 +366,12 @@ impl ActionList {
     /// run it).
     pub(crate) fn pop_head(&mut self) -> Option<Action> {
         (!self.0.is_empty()).then(|| self.0.remove(0))
+    }
+
+    /// `action` becomes the head (`FUN_140a97900`'s push for a unit below state 3), before what
+    /// the list holds, of its kind too.
+    pub(crate) fn push_head(&mut self, action: Action) {
+        self.0.insert(0, action);
     }
 
     /// The actions, the head first.

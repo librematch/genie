@@ -90,6 +90,7 @@ impl Action {
                     .release(missile_action.target.take().map(RoleId::id));
             }
             Self::Pack(pack_action) => idled.left.release(pack_action.target.take()),
+            Self::Unpack(unpack_action) => idled.left.release(unpack_action.target.take()),
             Self::Build(build_action) => {
                 if build_action.added
                     && let Some(target) = build_action.target
@@ -142,7 +143,8 @@ impl Action {
             | Self::Make(_)
             | Self::WaitSolidify(_)
             | Self::Housing(_)
-            | Self::Pack(_) => {}
+            | Self::Pack(_)
+            | Self::Unpack(_) => {}
         }
     }
 }

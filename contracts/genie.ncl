@@ -980,6 +980,7 @@
     treason | TreasonTuning | doc "The `treason` port's.",
     turn | TurnTuning | doc "The `turn` port's.",
     unit_ai | UnitAiTuning | doc "The `unit_ai` port's.",
+    unpack | UnpackTuning | doc "The `unpack` port's.",
     visibility | VisibilityTuning | doc "The `visibility` port's.",
     wait_solidify | WaitSolidifyTuning | doc "The `wait_solidify` port's.",
     wall | WallTuning | doc "The `wall` port's.",
@@ -1050,6 +1051,9 @@
     entries | Array (LineEntry) | doc "Table 1, by master id.",
     firsts | Array (MasterId) | doc "Table 2, by line + 399: the line's first master (none, the game's −1).",
     identifiers | Array (Array Dyn) | doc "The identifiers, with their line, in the file's order.",
+  },
+  UnpackTuning | doc "The `unpack` port's tuning values." = {
+    instant_work | Number | doc "The work a building's Unpack does in an update while the quick-build cheat holds (`DAT_14330ebe0`, the game's `+0xc14` not 0): its update (`0x140ae78f0`) adds it to its timer.\n\n`unpack::INSTANT_WORK`: 1000 in build 158041.",
   },
   UpgradeMode | doc "An upgrade effect's mode (its third argument, `FUN_141657d10`'s): 2 changes the effect's\nown object alone, −1 and 3 keep the objects' masters, 3 also takes the objects whose own\nmaster has the upgraded master's id; any other walks the objects and gives them masters\nof their own." = std.contract.from_predicate (fun x => std.is_number x && x % 1 == 0 && -32768 <= x && x <= 32767),
   VanishMode | doc "The set's flag names joined by ` | `, unnamed bits as one hexadecimal number (`0x10`)." = String,

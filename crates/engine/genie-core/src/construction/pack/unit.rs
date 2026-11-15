@@ -5,10 +5,13 @@
 use crate::GenieError;
 use crate::GenieResult;
 use crate::construction::MainBuildingId;
-use crate::construction::pack::{PackAction, PackState, PackStatus, PackTime, pack_time};
+use crate::construction::pack::{
+    PACK_NOT_BUILDING, PackAction, PackState, PackStatus, PackTime, pack_time,
+};
 use crate::map::Distance;
 use crate::map::Position;
 use crate::math::rng::Stream;
+use crate::objects::Frame;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
@@ -49,17 +52,15 @@ use crate::world::step::Step;
 /// has an action.
 const ATTACK_PRIORITY: OrderPriority = OrderPriority::of_data(0x32);
 
-/// A Pack whose master has no building part, which reads `+0x9ba` and `+0x990` of a building
-/// master: every master that packs is a building (type 80).
-const PACK_NOT_BUILDING: GenieError =
-    GenieError::unreachable("a Pack of a master without its building part");
-/// A Pack that gives its target to a unit AI the building has not got: the game calls slot 0x30
-/// through `+0x6b0` with no null test (`0x140ad6d69`) and faults.
+/// A Pack or an Unpack that gives its target to a unit AI the building has not got: the game
+/// calls slot 0x30 through `+0x6b0` with no null test (`0x140ad6d69`, `0x140ae7fd5`) and faults.
 const PACK_WITHOUT_UNIT_AI: GenieError =
-    GenieError::unreachable("a Pack's attack order through a null unit AI");
-/// A Pack's held target that the world does not hold, which its update's check let go first.
-const PACK_TARGET_GONE: GenieError =
-    GenieError::unreachable("a Pack's held target the world does not hold after its check");
+    GenieError::unreachable("a Pack's or Unpack's attack order through a null unit AI");
+/// A Pack's or an Unpack's held target that the world does not hold, which its update's check
+/// let go first.
+const PACK_TARGET_GONE: GenieError = GenieError::unreachable(
+    "a Pack's or Unpack's held target the world does not hold after its check",
+);
 
 impl PackAction {
     /// Whether its destructor puts its building back (`0x140ad548e`): in a played game
@@ -162,9 +163,9 @@ impl Unit {
         release(step, self, target, by)
     }
 
-    /// The Pack's work at 6 (`0x140ad69d0`): the work of the update ([`Unit::pack_work_done`])
+    /// The Pack's work at 6 (`0x140ad69d0`): the work of the update ([`Unit::building_work`])
     /// goes onto its timer ([`PackAction::work`]), the sprite takes the frame of the timer
-    /// ([`Unit::show_pack_frame`]), and once the timer reached the pack time the Pack is done
+    /// ([`Unit::show_work_frame`]), and once the timer reached the pack time the Pack is done
     /// (`set_state(1)`, 1) and its building transforms ([`Unit::pack_transform`]); else it goes
     /// on (0).
     ///
@@ -184,10 +185,14 @@ impl Unit {
                 (self.id, self.life.master_id),
                 step.world.model.masters.of(step.player),
             )?;
-            (self.pack_work_done(master, step), PackMaster::of(master)?)
+            let instant = step.world.model.tuning.pack.instant_work;
+            (
+                self.building_work(master, step, instant),
+                PackMaster::of(master)?,
+            )
         };
         let reached = pack.work(work, master.time);
-        self.show_pack_frame(&pack, master)?;
+        self.show_work_frame(|frames| pack.frame(master.time, frames))?;
         if reached == PackTime::Left {
             actions.list.set_pack(Some(pack));
             return Ok(HeadCode::of(UpdateCode::UnderWay));
@@ -198,16 +203,18 @@ impl Unit {
         Ok(HeadCode::of(UpdateCode::Done))
     }
 
-    /// The work a building's Pack does in this update (`0x140ad69d0`): the quick-build cheat's
-    /// while the game's `+0xc14` is not 0 (`FUN_140c884c0`, [`World::instant_work`];
-    /// [`PackTuning::instant_work`]); else its work rate, its powerup (slot 0x6e8, `+0xa30`) plus
-    /// its `master`'s (`+0x798`, `ADDSS` in that order), times the update's seconds
+    /// The work a building's Pack (`0x140ad69d0`) or Unpack (`FUN_140ae78f0`) does in this
+    /// update: the quick-build cheat's `instant` while the game's `+0xc14` is not 0
+    /// (`FUN_140c884c0`, [`World::instant_work`]; [`PackTuning::instant_work`],
+    /// [`UnpackTuning::instant_work`]); else its work rate, its powerup (slot 0x6e8, `+0xa30`)
+    /// plus its `master`'s (`+0x798`, `ADDSS` in that order), times the update's seconds
     /// (`world+0x164`). Its hit points take no part, as they do in the Housing's.
     ///
     /// [`PackTuning::instant_work`]: crate::world::layer::generated::PackTuning::instant_work
-    fn pack_work_done(&self, master: &Master, step: &Step<'_>) -> Seconds {
+    /// [`UnpackTuning::instant_work`]: crate::world::layer::generated::UnpackTuning::instant_work
+    pub(crate) fn building_work(&self, master: &Master, step: &Step<'_>, instant: f32) -> Seconds {
         if step.world.instant_work != 0 {
-            return Seconds::new(step.world.model.tuning.pack.instant_work);
+            return Seconds::new(instant);
         }
         Seconds::new(
             (step.world.parts.combat_of(self.id).work_rate_powerup
@@ -216,20 +223,25 @@ impl Unit {
         )
     }
 
-    /// The building's sprite takes the frame of the Pack's timer ([`PackAction::frame`], with the
-    /// frames of the sprite it shows, `+0x140`'s `+0x8`) when that is below the frames and not
-    /// the frame its sprite list shows of it (`FUN_1411933f0`, the list's slot 8): its sprite
-    /// list's slot 0x28 (`FUN_14119d2e0`, `FUN_1413ba880`) sets it ([`ActiveSprite::set_frame`]).
+    /// The building's sprite takes the frame of a Pack's or an Unpack's timer (`frame_of` the
+    /// frames of the sprite it shows, `+0x140`'s `+0x8`: [`PackAction::frame`],
+    /// [`UnpackAction::frame`]) when that is below the frames and not the frame its sprite list
+    /// shows of it (`FUN_1411933f0`, the list's slot 8): its sprite list's slot 0x28
+    /// (`FUN_14119d2e0`, `FUN_1413ba880`) sets it ([`ActiveSprite::set_frame`]).
     ///
     /// [`ActiveSprite::set_frame`]: crate::objects::sprite::ActiveSprite::set_frame
+    /// [`UnpackAction::frame`]: crate::construction::unpack::UnpackAction::frame
     ///
     /// # Errors
     ///
     /// A building without its sprite, whose frames the game reads through a null `+0x140`
     /// ([`NO_SPRITE`]).
-    fn show_pack_frame(&mut self, pack: &PackAction, master: PackMaster) -> GenieResult<()> {
+    pub(crate) fn show_work_frame(
+        &mut self,
+        frame_of: impl FnOnce(Frame) -> Option<Frame>,
+    ) -> GenieResult<()> {
         let sprite = self.sprite.as_mut().ok_or(NO_SPRITE)?;
-        if let Some(frame) = pack.frame(master.time, sprite.graphic.frames)
+        if let Some(frame) = frame_of(sprite.graphic.frames)
             && frame != sprite.frame
         {
             sprite.set_frame(frame);
@@ -239,7 +251,7 @@ impl Unit {
 
     /// The transform of a done Pack's building (`0x140ad6ce2` on): with its master's transform
     /// (`+0x9ba`) that its owner's masters hold (`player+0x28`), a held target goes to its unit
-    /// AI first ([`Unit::pack_attack_order`]), the Pack's status becomes
+    /// AI first ([`Unit::queue_siege_attack`]), the Pack's status becomes
     /// [`PackStatus::Transformed`], and the building takes that master (slot 0x90 with 0,
     /// [`World::transform`], the building lent back to its slot): its action list goes, this Pack
     /// with it. Without such a master the building stays.
@@ -264,7 +276,7 @@ impl Unit {
             return Ok(());
         };
         if let Some(target) = pack.target {
-            self.pack_attack_order(target, master.range, step)?;
+            self.queue_siege_attack(target, master.range, step)?;
         }
         pack.status = PackStatus::Transformed;
         actions.list.set_pack(Some(pack));
@@ -273,8 +285,9 @@ impl Unit {
         })
     }
 
-    /// The attack order (700) on the Pack's `target` that its update gives the building's unit AI
-    /// (`0x140ad6d69` to `0x140ad6faa`). It goes through the unit AI's slot 0x30
+    /// The attack order (700) on a Pack's or an Unpack's `target` that its update gives the
+    /// building's unit AI (`0x140ad6d69` to `0x140ad6faa`, `0x140ae7fd1` to `0x140ae8183`). It goes
+    /// through the unit AI's slot 0x30
     /// (`FUN_140c563d0`, which passes on to slot 0x28, `FUN_140c55c90`) with the issuer the
     /// building, the target's id, master (`+0xa0`'s id), owner (`+0x138`'s `+0x718`)
     /// and place (`+0x3c8`, `+0x4c8`, `+0x5a8`), the building's weapon `range` (slot 0x230),
@@ -287,7 +300,7 @@ impl Unit {
     ///
     /// A target the world lost or a building without a unit AI (unreachable errors), and the
     /// queue's.
-    fn pack_attack_order(
+    pub(crate) fn queue_siege_attack(
         &self,
         target: ObjectId,
         range: Distance,
@@ -326,7 +339,8 @@ impl Unit {
     /// torn-down Pack: with its timer at the pack time ([`PackTime::Reached`]) the unit's notify
     /// to its own unit AI ([`Step::notify_own`]: none without one, held while the AI's side runs);
     /// then a Pack the game undoes ([`PackAction::is_undone_in`]) puts the building back, the
-    /// building lent back to its slot ([`World::undo_pack`]). Its base teardown is the caller's.
+    /// building lent back to its slot ([`World::stand_with_annexes`]). Its base teardown is the
+    /// caller's.
     ///
     /// # Errors
     ///
@@ -343,7 +357,7 @@ impl Unit {
         }
         if pack.is_undone_in(step.world.game_state) {
             step.lend_at((self, actions), |world, player, idx| {
-                world.undo_pack(player, idx)
+                world.stand_with_annexes(player, idx)
             })?;
         }
         Ok(())
@@ -356,7 +370,7 @@ impl World {
     /// (`+0x6b0`) and its timer at the pack time, the unit's notify (slot 0x328,
     /// [`pack_completed`]) to its own unit AI; then a Pack the game undoes
     /// ([`PackAction::is_undone_in`]) takes the status 0, which nothing reads after it, and puts
-    /// the building back ([`World::undo_pack`]). The local
+    /// the building back ([`World::stand_with_annexes`]). The local
     /// player's interface flag (`DAT_143fb1d40 +0x1871`, for the selected object of the local
     /// player, `FUN_141663f50`) is the screen's. The base teardown (`FUN_140a73fc0`) lets the
     /// target go after it ([`World::let_go_torn`]).
@@ -382,13 +396,14 @@ impl World {
             )?;
         }
         if pack.is_undone_in(self.game_state) {
-            self.undo_pack(player, idx)?;
+            self.stand_with_annexes(player, idx)?;
         }
         Ok(())
     }
 
-    /// The building a Pack's destructor puts back (`0x140ad5498` to `0x140ad574c`), player
-    /// `player`'s unit at `idx`: it takes its master's standing sprite (slot 0x68 with `+0x470`,
+    /// The building a Pack's destructor puts back (`0x140ad5498` to `0x140ad574c`) and an
+    /// Unpack's update makes at its end (`0x140ae7d2c` to `0x140ae7f9b`), player `player`'s unit at
+    /// `idx`: it takes its master's standing sprite (slot 0x68 with `+0x470`,
     /// [`Unit::show_standing`]); then each annex slot of its master (`+0x990`, −1 none) makes its
     /// annex again ([`World::rebuild_annex`]).
     ///
@@ -396,7 +411,11 @@ impl World {
     ///
     /// A unit the world does not hold live, of a master it lacks or without its building part,
     /// and the sprite's and the annexes' making.
-    pub(crate) fn undo_pack(&mut self, player: PlayerId, idx: ListIndex) -> GenieResult<()> {
+    pub(crate) fn stand_with_annexes(
+        &mut self,
+        player: PlayerId,
+        idx: ListIndex,
+    ) -> GenieResult<()> {
         let unit = self.players.live_mut(player, idx)?;
         let rng = self.streams.get_mut(Stream::Sprite);
         unit.show_standing(
@@ -427,7 +446,8 @@ impl World {
         Ok(())
     }
 
-    /// One annex a Pack's destructor makes again for the building `id` in its slot `slot`: the
+    /// One annex a Pack's destructor or an Unpack's update makes for the building `id` in its
+    /// slot `slot`: the
     /// annex master's slot 0x40 with its owner `player`'s master (`player+0x28`, read with no
     /// null test) at `place` ([`World::remains`]: a building master's `FUN_14123d1a0`); the
     /// building's slot holds it (`+0xbc0` on), a building's main (`+0xbb8`) is the building, and

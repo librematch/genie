@@ -15,10 +15,13 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::Voice;
 use crate::objects::sprite::Graphic;
+use crate::players::PlayerKind;
 use crate::unit_ai::NotifyKind;
+use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{AiAction, Inbox};
 use crate::world::Seconds;
+use crate::world::layer::ClassRoles;
 use crate::world::layer::generated::MoveToTuning;
 use crate::{GenieError, GenieResult};
 
@@ -39,6 +42,24 @@ pub struct GiveUp {
     pub(crate) patience: Patience,
     /// The unit AI's stance (`+0x1a9`), 0 without one: below 2 it waits a second, else two.
     pub(crate) stance: UnitStance,
+}
+
+impl GiveUp {
+    /// What the giving up reads (`LAB_140aa320c`) of a unit of a player of kind `owner`, its
+    /// class's roles `class` and its unit AI `ai`: a human player's (`FUN_141659cf0` 0) villager
+    /// waits once, any other fails; the stance is the unit AI's, 0 ([`UnitStance::Aggressive`])
+    /// without one.
+    #[must_use]
+    pub(crate) fn of(owner: PlayerKind, class: ClassRoles, ai: Option<&UnitAi>) -> Self {
+        Self {
+            patience: if class.contains(ClassRoles::VILLAGER) && !owner.is_computer() {
+                Patience::WaitsOnce
+            } else {
+                Patience::Fails
+            },
+            stance: ai.map_or(UnitStance::Aggressive, |ai| ai.stance),
+        }
+    }
 }
 
 impl MoveToAction {
@@ -180,5 +201,46 @@ impl MoveToAction {
             state,
             ..Self::sub_to_point(Position::ORIGIN, Distance::ZERO, None)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::movement::move_to::{GiveUp, Patience};
+    use crate::players::PlayerKind;
+    use crate::unit_ai::{UnitAi, UnitStance};
+    use crate::world::layer::ClassRoles;
+
+    /// A human player's villager waits once, a computer's villager and a human player's other
+    /// unit fail; the stance is the unit AI's, aggressive without one.
+    #[test]
+    fn human_villager_waits_once_with_its_stance() {
+        let defensive = UnitAi {
+            stance: UnitStance::Defensive,
+            ..UnitAi::default()
+        };
+        let villager = ClassRoles::VILLAGER;
+        assert_eq!(
+            GiveUp::of(PlayerKind::Human, villager, Some(&defensive)),
+            GiveUp {
+                patience: Patience::WaitsOnce,
+                stance: UnitStance::Defensive,
+            }
+        );
+        assert_eq!(
+            GiveUp::of(PlayerKind::Gaia, villager | ClassRoles::GATE, None),
+            GiveUp {
+                patience: Patience::WaitsOnce,
+                stance: UnitStance::Aggressive,
+            }
+        );
+        assert_eq!(
+            GiveUp::of(PlayerKind::Computer, villager, Some(&defensive)).patience,
+            Patience::Fails
+        );
+        assert_eq!(
+            GiveUp::of(PlayerKind::Human, ClassRoles::GATE, None).patience,
+            Patience::Fails
+        );
     }
 }

@@ -99,7 +99,8 @@ impl Action {
     /// factory gives an Attack none (`FUN_140a97e00` case 7), a `MoveTo` and a Missile hold none,
     /// nor do a Transport of the unload command and an Explore of the explore command. The
     /// Attack's constructors (`FUN_140a7c210`, `FUN_140a7bf50`), the Missile's (`FUN_140a9a040`),
-    /// the Housing's (`FUN_140ac1b80`) and the Pack's (`FUN_140ad4ff0`) store no task.
+    /// the Housing's (`FUN_140ac1b80`), the Pack's (`FUN_140ad4ff0`) and the Unpack's
+    /// (`FUN_140ae58a0`) store no task.
     pub(crate) fn held_task(&self) -> Option<HeldTask> {
         match self {
             Self::Hunt(hunt_action) => Some(HeldTask {
@@ -129,7 +130,8 @@ impl Action {
             | Self::MoveTo(_)
             | Self::Missile(_)
             | Self::Housing(_)
-            | Self::Pack(_) => None,
+            | Self::Pack(_)
+            | Self::Unpack(_) => None,
         }
     }
 
@@ -155,7 +157,8 @@ impl Action {
             | Self::MoveTo(_)
             | Self::Missile(_)
             | Self::Housing(_)
-            | Self::Pack(_) => {}
+            | Self::Pack(_)
+            | Self::Unpack(_) => {}
         }
     }
 }
@@ -263,7 +266,8 @@ pub(crate) fn action_take_master(
         | Action::Make(_)
         | Action::WaitSolidify(_)
         | Action::Housing(_)
-        | Action::Pack(_) => {}
+        | Action::Pack(_)
+        | Action::Unpack(_) => {}
     }
 }
 

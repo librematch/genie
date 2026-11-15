@@ -456,8 +456,8 @@ impl World {
     /// it is the unit's own [`crate::objects::unit::Unit::head_takes_point`], whose released target goes
     /// here ([`World::release`]). Toward an object, an empty list takes nothing, nor does the
     /// base slot (`FUN_140a78490`) of a `MoveTo`, an Explore, a Build (0x140aade60), an Attack,
-    /// an Enter, a Fly, a missile, a Make, a wait for a foundation, a Housing or a Pack. The
-    /// Artifact's
+    /// an Enter, a Fly, a missile, a Make, a wait for a foundation, a Housing, a Pack or an Unpack.
+    /// The Artifact's
     /// (`FUN_140aaca30`) always takes it ([`World::artifact_take_object`]); the Hunt's
     /// (`0x140ac52c0`, [`World::hunt_take_move`]) and the Gather's (`0x140a8b740`,
     /// [`World::gather_take_move`]) decide themselves.
@@ -488,7 +488,8 @@ impl World {
                 | Action::Make(_)
                 | Action::WaitSolidify(_)
                 | Action::Housing(_)
-                | Action::Pack(_),
+                | Action::Pack(_)
+                | Action::Unpack(_),
             ) => Ok(Answer::NotTaken),
             Some(Action::Artifact(_)) => {
                 self.artifact_take_object(player, idx, target)?;

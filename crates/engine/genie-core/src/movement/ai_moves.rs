@@ -233,7 +233,7 @@ impl Unit {
     /// argument 0), the unit of player `player`. An empty list takes nothing (`FUN_140a98730`), nor
     /// does the base slot (`FUN_140a78490`, which answers 0) of a `MoveTo`, an Explore, a Build
     /// (`0x140aade60`), an Attack, an Enter, a Fly, a missile, a Make, a wait for a foundation, a
-    /// Housing or a Pack.
+    /// Housing, a Pack or an Unpack.
     /// The Artifact's (`FUN_140aaca30`) takes it ([`Artifact::take_point`]; a `MoveTo` it walked
     /// goes and stops the unit); the Hunt's (`FUN_140ac52c0`, [`HuntAction::take_move`]) unless its
     /// task has a work range; the Gather's (`0x140a8b740`,
@@ -281,7 +281,8 @@ impl Unit {
                 | ActionsAction::Make(_)
                 | ActionsAction::WaitSolidify(_)
                 | ActionsAction::Housing(_)
-                | ActionsAction::Pack(_),
+                | ActionsAction::Pack(_)
+                | ActionsAction::Unpack(_),
             ) => Ok(PointMove::Declined),
             Some(ActionsAction::Artifact(_)) => {
                 let sprites = self.point_sprites(sprites)?;

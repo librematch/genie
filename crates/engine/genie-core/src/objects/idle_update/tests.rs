@@ -14,6 +14,7 @@ use crate::construction::build::tests::started;
 use crate::construction::build::{BuildAction, BuildTask};
 use crate::construction::pack::{PackAction, PackState, PackStatus};
 use crate::construction::repair::{RepairAction, RepairState, RepairTask};
+use crate::construction::unpack::{UnpackAction, UnpackState, UnpackStatus};
 use crate::construction::wait_solidify::WaitSolidify;
 use crate::construction::{FoundationId, RepairTargetId};
 use crate::garrison::EnterState;
@@ -73,6 +74,7 @@ fn releasing(released: &[i32]) -> Idled {
             releases: released.iter().copied().map(object_id).collect(),
             builder_leaves: Vec::new(),
             pack: None,
+            unpack: None,
         },
     }
 }
@@ -230,6 +232,22 @@ fn enter_walking() -> EnterAction {
     }
 }
 
+/// The Unpack walking to 9149 (its quiet walk, `FUN_140aa0df0` through `FUN_140a7a170` with 1),
+/// not at work yet.
+fn unpack_walking() -> UnpackAction {
+    UnpackAction {
+        state: UnpackState::Moving {
+            move_to: Some(walk_holding(9149)),
+        },
+        target: Some(object_id(9149)),
+        point: Point::ORIGIN,
+        timer: Seconds::ZERO,
+        unique_id: QueueId::of_data(-1),
+        status: UnpackStatus::Idle,
+        range: Distance::new(15.9),
+    }
+}
+
 /// The Hunt of animal 1 in its state 12, carrying to drop site 2: its quiet Attack on the animal
 /// (`FUN_140a7c210` on the Hunt's `+0x20`) walking to it.
 fn hunt_attacking() -> HuntAction {
@@ -282,6 +300,18 @@ fn target_past_state_6_goes_and_is_let_go() {
                 timer: Seconds::new(3.0),
                 status: PackStatus::Packing,
                 unique_id: QueueId::of_data(-1),
+            }),
+            9150,
+        ),
+        (
+            Action::Unpack(UnpackAction {
+                state: UnpackState::Working,
+                target: Some(object_id(9150)),
+                point: Point::new(4.0, 5.0),
+                timer: Seconds::new(3.0),
+                unique_id: QueueId::of_data(-1),
+                status: UnpackStatus::Unpacking,
+                range: Distance::new(15.9),
             }),
             9150,
         ),
@@ -491,10 +521,10 @@ fn second_target_goes_by_its_own_state() {
     }
 }
 
-/// `FUN_140a98bf0` runs `FUN_140a784a0` on each sub-action: a walk's `MoveTo` (quiet), the
-/// Hunt's Attack (quiet) and the Artifact's Enter. A target past state 6 goes at every level and
-/// only the loud ones let it go: the Hunt's Attack clears the unit's attack count. A target in
-/// state 6 stays held at every level, and nothing changes.
+/// `FUN_140a98bf0` runs `FUN_140a784a0` on each sub-action: a walk's `MoveTo` (quiet, an
+/// Unpack's too), the Hunt's Attack (quiet) and the Artifact's Enter. A target past state 6 goes
+/// at every level and only the loud ones let it go: the Hunt's Attack clears the unit's attack
+/// count. A target in state 6 stays held at every level, and nothing changes.
 #[test]
 fn sub_actions_drop_their_targets_past_state_6_and_keep_them_in_state_6() {
     let entering = |target: Option<ObjectId>| Artifact {
@@ -541,6 +571,12 @@ fn sub_actions_drop_their_targets_past_state_6_and_keep_them_in_state_6() {
             holding(1, 3),
             true,
             vec![1, 2],
+        ),
+        (
+            Action::Unpack(unpack_walking()),
+            holding(9149, 2),
+            false,
+            vec![9149],
         ),
     ];
     for (action, held, clears_count, released) in cases {

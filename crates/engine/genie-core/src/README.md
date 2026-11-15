@@ -25,7 +25,7 @@ Start with these files:
 | [`trace.rs`](trace.rs) | What the engine tells a `tracing` subscriber while it runs, for debugging. |
 | [`combat/`](combat/) | Combat: attacks, hits and missiles. |
 | [`commands/`](commands/) | The commands (`Command`) and their dispatch (`World::run`): the handlers of the players' orders, the buildings' placement and the production queue's. |
-| [`construction/`](construction/) | Building and repairing: the Build and Repair actions with each worker's part of its update, the wait for a foundation, a building's own update, Housing and Pack, and the gates. |
+| [`construction/`](construction/) | Building and repairing: the Build and Repair actions with each worker's part of its update, the wait for a foundation, a building's own update, Housing, Pack and Unpack, and the gates. |
 | [`garrison/`](garrison/) | Units inside other objects: the garrison order, the Enter action, the unloads and the Transport action. |
 | [`gathering/`](gathering/) | Gathering resources: the Gather and Hunt actions with each gatherer's part of its update, a farm's food, the searches for a resource, the drop sites and drop-offs, the mill's and the dock's queues and the pastures. |
 | [`groups/`](groups/) | Unit groups and formations (FD-036): the game's `BUnitGroup` (`group.cpp`) with its motion (`BMotion`) and formations (`BFormation`). |

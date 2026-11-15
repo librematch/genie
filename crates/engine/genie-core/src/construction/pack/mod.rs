@@ -36,6 +36,11 @@ use crate::world::WholeSeconds;
 use genie_diff::Diff;
 use strum::FromRepr;
 
+/// A Pack or an Unpack whose master has no building part, which reads `+0x9ba` and `+0x990` of a
+/// building master: every master that packs or unpacks is a building (type 80).
+pub(crate) const PACK_NOT_BUILDING: GenieError =
+    GenieError::unreachable("a Pack or Unpack of a master without its building part");
+
 /// The progress of a Pack in state 1 (`FUN_140ad6170`'s `MOV EAX, 0x64`): all of it.
 const DONE: PackProgress = PackProgress(100);
 /// The whole of a Pack's progress, its percent (`DAT_14330ebcc`, `FUN_140ad6170`).
@@ -170,7 +175,8 @@ pub struct PackAction {
     pub(crate) unique_id: QueueId,
 }
 
-/// Whether a Pack's timer reached its pack time in its update ([`PackAction::work`]).
+/// Whether a Pack's or an Unpack's timer reached its master's pack time in its update
+/// ([`PackAction::work`], [`crate::construction::unpack::UnpackAction::work`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub(crate) enum PackTime {
@@ -181,9 +187,10 @@ pub(crate) enum PackTime {
 }
 
 impl PackTime {
-    /// `COMISS timer, time` with `JC` (`0x140ad6cd9`, `0x140ad5430`): reached when `timer` is
-    /// at least `time`; a timer or a time that is not a number has not reached it.
-    fn of(timer: Seconds, time: WholeSeconds) -> Self {
+    /// `COMISS timer, time` with `JC` (the Pack's `0x140ad6cd9`, `0x140ad5430`; the Unpack's
+    /// `0x140ae7d23`): reached when `timer` is at least `time`; a timer or a time that is not a
+    /// number has not reached it.
+    pub(crate) fn of(timer: Seconds, time: WholeSeconds) -> Self {
         if Seconds::of_master(time) <= timer {
             Self::Reached
         } else {

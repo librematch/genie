@@ -349,6 +349,9 @@
       stand_ground_patrol_leash = 0.5,
       stand_ground_slack = 0.25,
     },
+    unpack = {
+      instant_work = 1000,
+    },
     visibility = {
       edge = 0.01,
     },

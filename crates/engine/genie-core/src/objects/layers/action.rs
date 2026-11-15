@@ -190,6 +190,12 @@ impl Action {
                     .move_to()
                     .map(|move_to_action| move_to_action.state),
             ),
+            actions::Action::Unpack(unpack_action) => walking(
+                unpack_action
+                    .state
+                    .move_to()
+                    .map(|move_to_action| move_to_action.state),
+            ),
             actions::Action::MoveTo(_)
             | actions::Action::Missile(_)
             | actions::Action::Make(_)

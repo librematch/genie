@@ -91,7 +91,7 @@ object and the building.
    - `ownership/artifact.rs`: the Artifact.
    - `construction/build/unit.rs` and `construction/repair/unit.rs`: the Build and the Repair.
    - `construction/housing/unit.rs`: a building's Housing.
-   - `construction/pack/unit.rs`: a building's Pack.
+   - `construction/pack/unit.rs` and `construction/unpack/unit.rs`: a building's Pack and Unpack.
    - `garrison/unit.rs`: the inside update and the Enter.
    - `movement/unit.rs`: the `MoveTo`, the Explore and the Fly.
    - `gathering/make.rs`, `gathering/gather/unit.rs` and `gathering/hunt/hunter.rs`: the Make,
@@ -129,7 +129,7 @@ source files it comes from. The file names are those that the HD edition's debug
 | [`vision/`](../crates/engine/genie-core/src/vision/) | What each player sees: the visible maps, the vision masks, the objects-in-sight registry, the fog's ghosts, the explored tiles | `RGE_Visible_Map`, `RGE_Unified_Visible_Map`, `Visible_Unit_Manager`, `RGE_Doppleganger_Object` | `visible.cpp`, `vis_unit.cpp`, `VisibleUnitManager.cpp`, `dpl_obj.cpp` |
 | [`combat/`](../crates/engine/genie-core/src/combat/) | Attacks, hits and missiles: the Attack action, damage, passive abilities, missiles and volleys, a hit's victims | `RGE_Action_Attack`, `RGE_Missile_Object`, `RGE_Action_Missile`, `TRIBE_Combat_Object` | `act_atak.cpp`, `act_misl.cpp`, `misl_obj.cpp`, `t_c_obj.cpp`, `TribeMasterCombatObject.cpp` |
 | [`gathering/`](../crates/engine/genie-core/src/gathering/) | Gathering resources: the Gather and Hunt actions, a farm's food, the resource searches, drop sites, the mill's queues, pastures, the mule cart | `RGE_Action_Gather`, `TRIBE_Action_Hunt`, `RGE_Action_Make` | `act_gath.cpp`, `tact_gth.cpp`, `tact_hnt.cpp`, `act_make.cpp`, `tact_she.cpp` |
-| [`construction/`](../crates/engine/genie-core/src/construction/) | Building and repairing: the Build and Repair actions, the wait for a foundation, a building's own update, Housing and Pack, the gates | `TRIBE_Action_Build`, `TRIBE_Action_Repair`, `TRIBE_Action_Wait_Solidify`, `TRIBE_Action_Housing`, `TRIBE_Action_Pack`, `TRIBE_Building_Object` | `tact_bld.cpp`, `tact_rep.cpp`, `t_b_obj.cpp` |
+| [`construction/`](../crates/engine/genie-core/src/construction/) | Building and repairing: the Build and Repair actions, the wait for a foundation, a building's own update, Housing, Pack and Unpack, the gates | `TRIBE_Action_Build`, `TRIBE_Action_Repair`, `TRIBE_Action_Wait_Solidify`, `TRIBE_Action_Housing`, `TRIBE_Action_Pack`, `TRIBE_Action_Unpack`, `TRIBE_Building_Object` | `tact_bld.cpp`, `tact_rep.cpp`, `t_b_obj.cpp` |
 | [`garrison/`](../crates/engine/genie-core/src/garrison/) | Units inside other objects: garrisons, entering, unloading, transports | `RGE_Action_Enter`, `RGE_Action_Transport` | `act_entr.cpp`, `act_tran.cpp` |
 | [`production/`](../crates/engine/genie-core/src/production/) | A building's production queue and a trained unit's spawn | `TRIBE_Action_Make_Obj`, `TRIBE_Action_Make_Tech` | `t_b_obj.cpp`, `tact_mob.cpp` |
 | [`technology/`](../crates/engine/genie-core/src/technology/) | Technologies, their effects, and an object's upgrade to another master | `TRIBE_Player_Tech`, `TRIBE_Effects` | `tech.cpp`, `techtree.cpp`, `effects.cpp`, `teffects.cpp` |

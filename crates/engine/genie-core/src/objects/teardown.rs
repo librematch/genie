@@ -9,6 +9,7 @@ use crate::construction::FoundationId;
 use crate::construction::build::BuildAction;
 use crate::construction::pack::PackAction;
 use crate::construction::repair::RepairAction;
+use crate::construction::unpack::UnpackStatus;
 use crate::garrison::ContainerId;
 use crate::gathering::DropSiteId;
 use crate::movement::Speed;
@@ -28,8 +29,8 @@ use crate::world::step::Step;
 
 /// What an action's destructor or its idle update ([`crate::objects::idle_update`]) leaves its
 /// unit's world: the targets it lets go (slot 0x180), in order, the buildings a counted
-/// builder or repairer leaves (`FUN_140aaddb0`), what a destructor gives back and a Pack's own
-/// part.
+/// builder or repairer leaves (`FUN_140aaddb0`), what a destructor gives back and a Pack's or an
+/// Unpack's own part.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct TornDown {
     /// The objects let go, in the order the destructors let them go.
@@ -44,18 +45,24 @@ pub(crate) struct TornDown {
     /// ([`crate::world::World::pack_torn_down`] from the world,
     /// [`crate::objects::unit::Unit::pack_left`] in the unit's step).
     pub(crate) pack: Option<PackAction>,
+    /// The status of the Unpack whose destructor ran (`FUN_140ae67c0`): the building it turns
+    /// back comes before its base teardown, which the caller runs first
+    /// ([`crate::world::World::unpack_torn_down`] from the world,
+    /// [`crate::objects::unit::Unit::unpack_left`] in the unit's step).
+    pub(crate) unpack: Option<UnpackStatus>,
 }
 
-/// A Pack's teardown that reached [`TornDown::let_go`]: only the unit's own deletions
-/// ([`Unit::delete_own_head`], [`Unit::set_only_own_action_with`]) tear a Pack down in its step,
-/// and they run its part first ([`Unit::let_go_own`]); an idle update and an Enter's teardown
-/// leave none.
+/// A Pack's or an Unpack's teardown that reached [`TornDown::let_go`]: only the unit's own
+/// deletions ([`Unit::delete_own_head`], [`Unit::set_only_own_action_with`]) and an Unpack's
+/// `set_state(6)` tear one down in its step, and they run its part first ([`Unit::let_go_own`]);
+/// an idle update and an Enter's teardown leave none.
 ///
 /// [`Unit::delete_own_head`]: crate::objects::unit::Unit::delete_own_head
 /// [`Unit::set_only_own_action_with`]: crate::objects::unit::Unit::set_only_own_action_with
 /// [`Unit::let_go_own`]: crate::objects::unit::Unit::let_go_own
-const PACK_LEFT_UNRUN: GenieError =
-    GenieError::unreachable("a torn-down Pack whose own part its unit's deletion did not run");
+const PACK_LEFT_UNRUN: GenieError = GenieError::unreachable(
+    "a torn-down Pack or Unpack whose own part its unit's deletion did not run",
+);
 
 /// What an action's destructor gives back to its unit's owner.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -101,12 +108,14 @@ impl TornDown {
         }
     }
 
-    /// Whether it lets nothing go, leaves no building, gives nothing back and holds no Pack.
+    /// Whether it lets nothing go, leaves no building, gives nothing back and holds no Pack and
+    /// no Unpack.
     pub(crate) const fn is_empty(&self) -> bool {
         self.releases.is_empty()
             && self.builder_leaves.is_empty()
             && matches!(self.refund, Refund::Nothing)
             && self.pack.is_none()
+            && self.unpack.is_none()
     }
 
     /// What the destructors left, applied at once from the update, `by` the unit letting go: what
@@ -115,7 +124,7 @@ impl TornDown {
     ///
     /// # Errors
     ///
-    /// A Pack whose own part did not run ([`PACK_LEFT_UNRUN`]), the give-back's and
+    /// A Pack or an Unpack whose own part did not run ([`PACK_LEFT_UNRUN`]), the give-back's and
     /// [`crate::world::lets::torn_down`]'s.
     pub(crate) fn let_go(
         self,
@@ -123,7 +132,7 @@ impl TornDown {
         me: &mut Unit,
         by: Releaser,
     ) -> GenieResult<()> {
-        if self.pack.is_some() {
+        if self.pack.is_some() || self.unpack.is_some() {
             return Err(PACK_LEFT_UNRUN.with("object", me.id));
         }
         step.world.give_back_torn(self.refund, by.player)?;
@@ -160,7 +169,11 @@ impl From<Option<&MoveToAction>> for TornWalk {
 
 /// The unit's stop (slot 0x5d0) for a torn-down action whose `walk` stops, when the unit moves
 /// at all.
-fn stop_if_moving(mut motion: MotionMut<'_>, walk: TornWalk) -> GenieResult<()> {
+///
+/// # Errors
+///
+/// The stop that the motion step does not model.
+pub(crate) fn stop_if_moving(mut motion: MotionMut<'_>, walk: TornWalk) -> GenieResult<()> {
     if walk == TornWalk::Stops
         && let Some(mover) = motion.mover_mut()
     {
@@ -185,7 +198,10 @@ impl Action {
     /// (`0x140ac20f0`) gives its cost back at work ([`HousingAction::refund`]) and holds none
     /// either. The Pack's (`0x140ad6070` over `FUN_140ad5370`) hands itself to the caller for its
     /// notify and the building it puts back ([`TornDown::pack`]), then its base teardown lets
-    /// its target go: it is loud.
+    /// its target go: it is loud. The Unpack's (`FUN_140ae67c0`) hands its status to the caller
+    /// for the building it turns back ([`TornDown::unpack`]), then its base teardown lets its
+    /// target go, loud too, and its `MoveTo`'s stops the unit: at work (status 1), the one status
+    /// its own part reads, it holds no `MoveTo` (`set_state` deletes it, and the load refuses one).
     ///
     /// [`HousingAction::refund`]: crate::construction::housing::HousingAction::refund
     ///
@@ -200,6 +216,11 @@ impl Action {
             Self::Pack(pack_action) => {
                 torn.pack = Some(pack_action);
                 torn.release(pack_action.target);
+            }
+            Self::Unpack(unpack_action) => {
+                torn.unpack = Some(unpack_action.status);
+                torn.release(unpack_action.target);
+                stop_if_moving(motion, TornWalk::from(unpack_action.state.move_to()))?;
             }
             Self::Artifact(mut artifact) => {
                 let (released, gone) = artifact.tear_down();
@@ -382,11 +403,11 @@ impl Unit {
     /// action layer `actions`, its step): the Artifact's (`0x140aac960`) acts only with 1, the
     /// wait for a foundation's (`0x140ae87c0`) is empty, and the Make's (`0x140a99980`) starts it
     /// again ([`MakeAction::first`] with its owner's attributes); the Housing's (`0x140ac2240`)
-    /// acts only with 1 ([`HousingAction::start`]), as the Pack's (`0x140ad6150`) does. The
-    /// Explore's (`0x140a87e10`)
-    /// starts it again too ([`Unit::restart_explore`]: to its point, or waiting for one); the
-    /// Transport's (`FUN_140aa3e10`) idles ([`Unit::restart_transport`]) and the missile's
-    /// (`0x140a9c5b0`) flies ([`MissileAction::restart`]). A `MoveTo` of its own (`0x140aa2100`)
+    /// acts only with 1 ([`HousingAction::start`]), as the Pack's (`0x140ad6150`) and the
+    /// Unpack's (`FUN_140ae68f0`) do. The Explore's (`0x140a87e10`) starts it again too
+    /// ([`Unit::restart_explore`]: to its point, or waiting for one); the Transport's
+    /// (`FUN_140aa3e10`) idles ([`Unit::restart_transport`]) and the missile's (`0x140a9c5b0`)
+    /// flies ([`MissileAction::restart`]). A `MoveTo` of its own (`0x140aa2100`)
     /// walks and updates at once ([`Unit::restart_move_to`]); an Enter (`0x140a86f20`) starts again
     /// on its target ([`Unit::restart_enter`]). A Hunt (`0x140ac49b0`) takes the task's load from
     /// a target that holds something and searches ([`Unit::hunt_begin_search`]); a Gather
@@ -418,7 +439,8 @@ impl Unit {
                 Action::Artifact(_)
                 | Action::WaitSolidify(_)
                 | Action::Housing(_)
-                | Action::Pack(_),
+                | Action::Pack(_)
+                | Action::Unpack(_),
             ) => Ok(()),
             Some(Action::Make(make)) => {
                 make.first(
@@ -573,6 +595,7 @@ mod tests {
                 builder_leaves: vec![object_id(10028)],
                 refund: Refund::Nothing,
                 pack: None,
+                unpack: None,
             }
         );
         assert!(!moves(&motion));

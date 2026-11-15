@@ -241,14 +241,15 @@ impl World {
     }
 
     /// What an action list's destructors left (`torn`) applied by `by`, the unit at `idx` of its
-    /// player: a torn-down Pack's own part first ([`World::pack_torn_down`]), then what a
+    /// player: a torn-down Pack's or Unpack's own part first ([`World::pack_torn_down`],
+    /// [`World::unpack_torn_down`]), then what a
     /// destructor gave back to `by`'s player ([`World::give_back_torn`]), then a counted builder
     /// leaves its building (`FUN_140aadbf0` before its base teardown, [`World::leave_builders`]),
     /// then the targets go (slot 0x180, [`World::release`]).
     ///
     /// # Errors
     ///
-    /// The Pack's part, the give-back's, the leaves' and the releases'.
+    /// The Pack's and the Unpack's parts, the give-back's, the leaves' and the releases'.
     pub(crate) fn let_go_torn(
         &mut self,
         torn: TornDown,
@@ -257,6 +258,9 @@ impl World {
     ) -> GenieResult<()> {
         if let Some(pack) = torn.pack {
             self.pack_torn_down(by.player, idx, pack)?;
+        }
+        if let Some(status) = torn.unpack {
+            self.unpack_torn_down(by.player, idx, status)?;
         }
         self.give_back_torn(torn.refund, by.player)?;
         for id in torn.builder_leaves {

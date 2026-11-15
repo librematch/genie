@@ -20,7 +20,7 @@ use crate::objects::actions::Action;
 use crate::objects::masters::ActionKind;
 use crate::objects::release::Releaser;
 use crate::objects::sprite::new_sprite;
-use crate::objects::teardown::TornWalk;
+use crate::objects::teardown::{TornWalk, stop_if_moving};
 use crate::ownership::artifact::ANIMAL_UNMOVING;
 use crate::ownership::artifact::Artifact;
 use crate::players::PlayerId;
@@ -108,10 +108,10 @@ impl World {
 
     /// The object stop (slot 0x148, `FUN_14108c050`; a building's `FUN_1411e6290`) of the object
     /// at `idx` of player `player_id`: the action object's stop (`FUN_14106fa60`): its pack
-    /// progress (`+0x88a`) takes a top Pack's share done (`FUN_140ad6170`,
-    /// [`crate::construction::pack::PackAction::progress`]), else 0 (a top Unpack's,
-    /// `FUN_140ae6cd0`, is not modelled); then its top action's slot 0x38
-    /// ([`World::halt_top_action`]); the action list goes ([`World::clear_actions`])
+    /// progress (`+0x88a`) takes a top Pack's or Unpack's share done (`FUN_140ad6170`,
+    /// [`crate::construction::pack::PackAction::progress`]; `FUN_140ae6cd0`,
+    /// [`crate::construction::unpack::UnpackAction::progress`]), else 0; then its top action's
+    /// slot 0x38 ([`World::halt_top_action`]); the action list goes ([`World::clear_actions`])
     /// unless that answered true for a unit that is no trade cart with goods; then a unit AI of
     /// a class other than 58 whose action value is not `0x2c2` and whose top action is no trade
     /// (0x6f) with a load stops (slot 0xb0 with 0: the order ends, and stopAction, slot 0x3c0)
@@ -122,9 +122,7 @@ impl World {
         let class = master.class;
         let progress = match self.parts.actions_of(unit.id).list.head() {
             Some(Action::Pack(pack)) => pack.progress(pack_time(master)),
-            Some(head) if head.kind() == ActionKind::UNPACK => {
-                return Err(GenieError::unsupported("a stop of an action of type 0x7d"));
-            }
+            Some(Action::Unpack(unpack)) => unpack.progress(pack_time(master)),
             _ => PackProgress::NONE,
         };
         // an object whose layer the table does not hold reads 0 already: no entry for it
@@ -273,9 +271,11 @@ impl World {
     /// (`FUN_140a82ac0`, [`crate::combat::attack::Attack::halt`]), the Artifact's
     /// (`FUN_140aad1a0`, [`crate::ownership::artifact::Artifact::stop`]) and the Transport's
     /// (`FUN_140aa4620`, [`World::halt_transport`]) and the Pack's (`0x140ad69b0`,
-    /// [`crate::construction::pack::PackAction::halt`]: done). The Gather, the Build and
-    /// the Artifact show the master's standing sprite (the Gather the task's carrying one while it
-    /// carries at least 1 of the task's resource, `FUN_140a8b6b0`).
+    /// [`crate::construction::pack::PackAction::halt`]: done) and the Unpack's (`FUN_140ae78d0`,
+    /// [`crate::construction::unpack::UnpackAction::halt`]: done, its `MoveTo`'s teardown stopping
+    /// the unit). The Gather, the Build and the Artifact show the master's standing sprite (the
+    /// Gather the task's carrying one while it carries at least 1 of the task's resource,
+    /// `FUN_140a8b6b0`).
     /// [`Action::list`](crate::objects::layers::Action::list) holds no other kind.
     pub(super) fn halt_other(
         &mut self,
@@ -312,6 +312,12 @@ impl World {
                 pack.halt();
                 let id = self.players.live(player_id, idx)?.id;
                 self.parts.actions.of_mut(id)?.list.set_pack(Some(pack));
+            }
+            Action::Unpack(mut unpack) => {
+                let walk = unpack.halt();
+                let id = self.players.live(player_id, idx)?.id;
+                self.parts.actions.of_mut(id)?.list.set_unpack(Some(unpack));
+                stop_if_moving(self.parts.motion.layer_mut(id), walk)?;
             }
             Action::MoveTo(_)
             | Action::Explore(_)

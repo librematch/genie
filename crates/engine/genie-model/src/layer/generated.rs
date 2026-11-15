@@ -872,6 +872,8 @@ pub struct Tuning {
     pub turn: TurnTuning,
     /// The `unit_ai` port's.
     pub unit_ai: UnitAiTuning,
+    /// The `unpack` port's.
+    pub unpack: UnpackTuning,
     /// The `visibility` port's.
     pub visibility: VisibilityTuning,
     /// The `wait_solidify` port's.
@@ -2148,6 +2150,16 @@ pub struct UnitAiTuning {
     ///
     /// `unit_ai::STAND_GROUND_SLACK`: 0.25 in build 158041.
     pub stand_ground_slack: f32,
+}
+
+/// The `unpack` port's tuning values.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct UnpackTuning {
+    /// The work a building's Unpack does in an update while the quick-build cheat holds (`DAT_14330ebe0`, the game's `+0xc14` not 0): its update (`0x140ae78f0`) adds it to its timer.
+    ///
+    /// `unpack::INSTANT_WORK`: 1000 in build 158041.
+    pub instant_work: f32,
 }
 
 /// The `visibility` port's tuning values.

@@ -639,7 +639,7 @@ fn update_at_pack_time_without_unit_ai_fails() {
     world.parts.set_unit_ai(TREBUCHET, None);
     assert_eq!(
         updated(&mut world, 2000).unwrap_err().reason(),
-        "a Pack's attack order through a null unit AI"
+        "a Pack's or Unpack's attack order through a null unit AI"
     );
 }
 
@@ -680,7 +680,7 @@ fn update_of_master_without_building_part_fails() {
         .building = None;
     assert_eq!(
         updated(&mut world, 2000).unwrap_err().reason(),
-        "a Pack of a master without its building part"
+        "a Pack or Unpack of a master without its building part"
     );
 }
 
@@ -809,7 +809,7 @@ fn torn_pack_hands_itself_over_and_releases_its_target() {
     });
     assert_eq!(
         refused.unwrap_err().reason(),
-        "a torn-down Pack whose own part its unit's deletion did not run"
+        "a torn-down Pack or Unpack whose own part its unit's deletion did not run"
     );
 }
 

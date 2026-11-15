@@ -10,10 +10,12 @@ use crate::construction::build::BuildState;
 use crate::construction::build::BuildTask;
 use crate::construction::housing::{HousingAction, HousingState};
 use crate::construction::pack::{PackAction, PackState, PackStatus};
+use crate::construction::unpack::{UnpackAction, UnpackState, UnpackStatus};
 use crate::garrison::transport::TransportMode;
 use crate::gathering::DropSiteId;
 use crate::gathering::FarmStops;
 use crate::map::Distance;
+use crate::map::Point;
 use crate::map::Position;
 use crate::movement::explore::EXPLORE;
 use crate::movement::move_to::MoveWaitState;
@@ -57,7 +59,7 @@ use genie_save::generated::world::{
     Action, PlayerObjects, RgeAction, RgeActionAttack, RgeActionByKind, RgeActionEnter,
     RgeActionGather, RgeActionMake, RgeActionMissile, RgeActionMoveTo, RgeMissileObject, RgeObject,
     TribeActionArtifact, TribeActionBuild, TribeActionHousing, TribeActionHunt, TribeActionPack,
-    TribeActionRepair, TribeActionWaitSolidify,
+    TribeActionRepair, TribeActionUnpack, TribeActionWaitSolidify,
 };
 
 /// The task of slot `id`, its work range `range`.
@@ -1710,6 +1712,106 @@ fn pack_refuses_what_no_pack_holds() {
     );
     assert_eq!(
         imported(ActionKind::PACK, explore(base(6)))
+            .unwrap_err()
+            .kind(),
+        crate::ErrorKind::Unreachable
+    );
+}
+
+/// A saved Unpack (type 0x7d) of base `rge_action` and queue id 7, of status `status`, range 15.9
+/// and timer 12.5.
+fn saved_unpack(rge_action: RgeAction, status: u8) -> Action {
+    Action {
+        tribe_action_unpack: Some(Box::new(TribeActionUnpack {
+            rge_action,
+            unique_id: 7,
+            unpack_status: status,
+            range: 15.9,
+            timer: 12.5,
+        })),
+        ..Action::default()
+    }
+}
+
+/// The Unpack's load (`FUN_140ae59d0`): its base's state, target and point, its queue id, its
+/// status, its range and its own timer, not the base's; a target −1 is none; a walk takes its
+/// quiet `MoveTo`.
+#[test]
+fn unpack_takes_its_state_target_point_status_range_timer_and_queue_id() {
+    let unpack = |rge_action, status| {
+        imported(ActionKind::UNPACK, saved_unpack(rge_action, status))
+            .unwrap()
+            .list
+            .unpack()
+            .copied()
+    };
+    let aimed = RgeAction {
+        target_id: 21,
+        ..base(6)
+    };
+    assert_eq!(
+        unpack(aimed, 1),
+        Some(UnpackAction {
+            state: UnpackState::Working,
+            target: Some(object_id(21)),
+            point: Point::new(1.0, 2.0),
+            timer: Seconds::new(12.5),
+            unique_id: QueueId::of_data(7),
+            status: UnpackStatus::Unpacking,
+            range: Distance::new(15.9),
+        })
+    );
+    let done = unpack(base(1), 2).unwrap();
+    assert_eq!(
+        (done.state, done.target, done.status),
+        (UnpackState::Done, None, UnpackStatus::Unpacked)
+    );
+    let made = unpack(base(0), 0).unwrap();
+    assert_eq!(
+        (made.state, made.status),
+        (UnpackState::New, UnpackStatus::Idle)
+    );
+    assert_eq!(unpack(base(13), 0).unwrap().state, UnpackState::Failed);
+    let walking = unpack(with_sub(base(11), MOVE_TO, quiet(move_to(4, 0.5))), 0).unwrap();
+    let UnpackState::Moving {
+        move_to: Some(move_to_action),
+    } = walking.state
+    else {
+        panic!("a walk: {walking:?}");
+    };
+    assert_eq!(
+        (move_to_action.state, move_to_action.voice),
+        (MoveTo::Moving, Voice::Quiet)
+    );
+    assert_eq!(
+        unpack(base(11), 0).unwrap().state,
+        UnpackState::Moving { move_to: None }
+    );
+}
+
+/// A saved Unpack with a sub-action other than a `MoveTo`, a `MoveTo` outside a walk or at work,
+/// in a state or a status of no Unpack or without its own part is no game's.
+#[test]
+fn unpack_refuses_what_no_unpack_holds() {
+    let refused = |rge_action, status| {
+        imported(ActionKind::UNPACK, saved_unpack(rge_action, status)).unwrap_err()
+    };
+    assert_eq!(
+        refused(with_sub(base(11), EXPLORE, explore(base(3))), 0),
+        GenieError::invalid_input("a saved Unpack with another sub-action")
+    );
+    assert_eq!(
+        refused(with_sub(base(11), MOVE_TO, quiet(move_to(4, 0.5))), 1),
+        GenieError::invalid_input("a saved Unpack walking at work")
+    );
+    assert_eq!(
+        refused(with_sub(base(6), MOVE_TO, quiet(move_to(4, 0.5))), 0).reason(),
+        "a MoveTo of an Unpack that does not walk"
+    );
+    assert_eq!(refused(base(2), 0).reason(), "no state of an Unpack");
+    assert_eq!(refused(base(6), 3).reason(), "no status of an Unpack");
+    assert_eq!(
+        imported(ActionKind::UNPACK, explore(base(6)))
             .unwrap_err()
             .kind(),
         crate::ErrorKind::Unreachable

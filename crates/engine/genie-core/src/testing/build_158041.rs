@@ -50,6 +50,7 @@ use genie_model::layer::generated::TreasonTuning;
 use genie_model::layer::generated::Tuning;
 use genie_model::layer::generated::TurnTuning;
 use genie_model::layer::generated::UnitAiTuning;
+use genie_model::layer::generated::UnpackTuning;
 use genie_model::layer::generated::VisibilityTuning;
 use genie_model::layer::generated::WaitSolidifyTuning;
 use genie_model::layer::generated::WallTuning;
@@ -107,6 +108,7 @@ pub fn build_158041() -> BuildLayer {
             treason: treason(),
             turn: turn(),
             unit_ai: unit_ai(),
+            unpack: unpack(),
             visibility: visibility(),
             wait_solidify: wait_solidify(),
             wall: wall(),
@@ -1560,6 +1562,13 @@ const fn unit_ai() -> UnitAiTuning {
         stance_range_growth: f32::from_bits(0x3f00_0000),
         stand_ground_patrol_leash: f32::from_bits(0x3f00_0000),
         stand_ground_slack: f32::from_bits(0x3e80_0000),
+    }
+}
+
+/// The `unpack` port's tuning values.
+const fn unpack() -> UnpackTuning {
+    UnpackTuning {
+        instant_work: f32::from_bits(0x447a_0000),
     }
 }
 

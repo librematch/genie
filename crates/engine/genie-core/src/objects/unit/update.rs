@@ -167,6 +167,7 @@ impl Unit {
             Some(Action::Make(_)) => self.make_part(actions, step, roles),
             Some(Action::Housing(_)) => self.housing_part(actions, step),
             Some(Action::Pack(_)) => self.pack_part(actions, step),
+            Some(Action::Unpack(_)) => self.unpack_part(actions, step, me),
             Some(Action::Gather(gather)) => {
                 let gather = *gather;
                 self.gather_update(gather, actions, step, me, roles)

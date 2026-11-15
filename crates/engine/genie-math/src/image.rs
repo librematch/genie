@@ -490,6 +490,12 @@ pub mod unit_ai {
     pub const STILL: f32 = f32::from_bits(0x33d6_bf95);
 }
 
+/// The values the `unpack` port reads.
+pub mod unpack {
+    /// 100.0
+    pub const PERCENT: f32 = f32::from_bits(0x42c8_0000);
+}
+
 /// The values the `upgrade` port reads.
 pub mod upgrade {
     /// 100.0

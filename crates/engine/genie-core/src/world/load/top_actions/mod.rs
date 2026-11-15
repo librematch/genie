@@ -5,7 +5,6 @@ use crate::combat::missile::ShooterId;
 use crate::commands::QueueId;
 use crate::construction::build::{BuildAction, BuildTask};
 use crate::construction::housing::{HousingAction, HousingState};
-use crate::construction::pack::{PackAction, PackState, PackStatus};
 use crate::garrison::ContainerId;
 use crate::gathering::DropSiteId;
 use crate::map::Distance;
@@ -31,6 +30,7 @@ use genie_import::save::parts::combat_master;
 use genie_save::generated::world::{Action, PlayerObjects, RgeAction, RgeStaticObject};
 
 mod gathering;
+mod packing;
 
 use crate::combat::attack::ATTACK;
 use crate::combat::missile::{
@@ -52,6 +52,7 @@ use crate::movement::{Acceleration, Speed};
 use crate::objects::Graphics;
 use crate::ownership::artifact::{Artifact, ArtifactState, ArtifactSub};
 use crate::world::load::top_actions::gathering::{import_gather, import_hunt, import_make};
+use crate::world::load::top_actions::packing::{import_pack, import_unpack};
 use genie_save::generated::world::ActionList as WorldActionList;
 
 /// A task slot's task of a master (the master, the slot).
@@ -129,7 +130,7 @@ struct SavedObject<'save> {
 /// bird's Fly action (10) with its `MoveTo`, the Hunt (110) with its Attack or `MoveTo` (and in
 /// state 8 its second target, the drop site), a farm's Make (21), the Repair, the Gather, the
 /// Enter, the Transport, the Explore, the Attack, the missile's, the wait for a foundation, the
-/// Housing and the Pack.
+/// Housing, the Pack and the Unpack.
 /// Any other saved action ([`not_imported`]) stops the object's player.
 fn saved_action(
     saved_object: SavedObject<'_>,
@@ -172,6 +173,7 @@ fn saved_action(
         WAIT_SOLIDIFY => import_wait_solidify(&saved, task_at),
         ActionKind::HOUSING => import_housing(&saved),
         ActionKind::PACK => import_pack(&saved),
+        ActionKind::UNPACK => import_unpack(&saved),
         _ => Err(not_imported().with("action type", kind)),
     }
 }
@@ -643,34 +645,6 @@ fn import_housing(saved: &Saved<'_>) -> GenieResult<ActionsAction> {
     Ok(ActionsAction::from(HousingAction {
         state: HousingState::of_byte(saved.base.state)?,
         timer: Seconds::new(saved.base.timer),
-        unique_id: QueueId::of_data(part.unique_id),
-    }))
-}
-
-/// `TRIBE_Action_Pack`'s load (`FUN_140ad5090`): the base action's state and target (the base's
-/// load with 1, `FUN_140a73f00`), the order's queue id (`unique_id`, `+0x6c`), the status
-/// (`m_packStatus`, `+0x68`) and the timer (`mTimer`, `+0x44`, which the reader holds from save
-/// version `0xa451e` on: every save it reads). Its last writes, the order 0x2db and the action
-/// 0x277 to its unit's unit AI (`FUN_140c64b60`, `FUN_140c64b50`), find none: the combat
-/// object's load (`FUN_14121ec90`) clears `+0x6b0` (`0x14121ecd5`) before its base's
-/// (`FUN_141089880`) reads the action list, and makes the unit AI after it. No slot of the Pack's
-/// makes a sub-action, so a save that holds one is no game's.
-fn import_pack(saved: &Saved<'_>) -> GenieResult<ActionsAction> {
-    if saved.base.sub_actions.entries().next().is_some() {
-        return Err(GenieError::invalid_input("a saved Pack with a sub-action"));
-    }
-    let part = saved
-        .action
-        .tribe_action_pack
-        .as_deref()
-        .ok_or(GenieError::unreachable(
-            "a saved Pack without its own part, which the reader gives every action of type 0x7c",
-        ))?;
-    Ok(ActionsAction::from(PackAction {
-        state: PackState::of_byte(saved.base.state)?,
-        target: ObjectId::of_field(saved.base.target_id),
-        timer: Seconds::new(part.timer),
-        status: PackStatus::of_byte(part.pack_status)?,
         unique_id: QueueId::of_data(part.unique_id),
     }))
 }

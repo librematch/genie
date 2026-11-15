@@ -32,7 +32,7 @@ impl Unit {
     /// action list goes ([`Unit::tear_down_actions`], with the target of the unit AI the world
     /// holds: the AI's calls return it there,
     /// [`crate::unit_ai::world_view::UnitView::effect_now`]), then a unit in state 2 shows slot
-    /// 0x798's sprite ([`Unit::standing_shown`]) with slot 0x68 ([`Unit::show_graphic_standing`]).
+    /// 0x798's sprite ([`Unit::standing_shown`]) with slot 0x68 ([`Unit::show_graphic`]).
     /// The debug log around them (`DAT_143f09029`) reads the world time and changes nothing.
     ///
     /// # Errors
@@ -48,7 +48,7 @@ impl Unit {
         self.tear_down_actions(actions, step, ai_target, by)?;
         if self.life.state == ObjectState::Alive {
             let standing = self.standing_shown(step)?;
-            self.show_graphic_standing(
+            self.show_graphic(
                 step.world.parts.motion.layer_mut(self.id),
                 standing,
                 step.world.streams.get_mut(Stream::Sprite),
@@ -109,7 +109,7 @@ impl Unit {
 
     /// The unit's slot 0x68 with its master's standing sprite (its `+0x470`, which the Repair's
     /// and the Transport's `set_state` read themselves, not through slot 0x798), its master its
-    /// own or its owner's (`masters`): [`Unit::show_graphic_standing`]. A routine that calls slot
+    /// own or its owner's (`masters`): [`Unit::show_graphic`]. A routine that calls slot
     /// 0x798 shows that slot's sprite instead ([`Unit::standing_shown`]).
     ///
     /// # Errors
@@ -128,19 +128,20 @@ impl Unit {
             .standing_sprite
             .and_then(|sprite_id| graphics.get(sprite_id))
             .copied();
-        self.show_graphic_standing(motion, standing, sprite, sprite_tuning)
+        self.show_graphic(motion, standing, sprite, sprite_tuning)
     }
 
-    /// The unit's slot 0x68 with the standing sprite `standing` (none where the slice's graphics
-    /// lack it): its top speed becomes the sprite's ([`MoveToAction::shows_standing`]) and,
-    /// where the slice holds its sprite, the sprite starts ([`new_sprite`] on the Sprite stream).
+    /// The unit's slot 0x68 with the sprite `standing` (its standing one, or an Unpack's
+    /// construction sprite; none where the slice's graphics lack it): its top speed becomes the
+    /// sprite's ([`MoveToAction::shows_standing`]) and, where the slice holds its sprite, the
+    /// sprite starts ([`new_sprite`] on the Sprite stream).
     ///
     /// [`MoveToAction::shows_standing`]: crate::movement::move_to::MoveToAction::shows_standing
     ///
     /// # Errors
     ///
     /// A sprite the slice holds without the standing one.
-    fn show_graphic_standing(
+    pub(crate) fn show_graphic(
         &mut self,
         mut motion: MotionMut<'_>,
         standing: Option<Graphic>,
@@ -287,12 +288,12 @@ impl Unit {
     }
 
     /// What a deletion of the unit's own list left (`torn`), applied at once from its step: a
-    /// torn-down Pack's own part first ([`Unit::pack_left`] on the unit's action layer
-    /// `actions`), then the rest by `by` ([`TornDown::let_go`]).
+    /// torn-down Pack's or Unpack's own part first ([`Unit::pack_left`], [`Unit::unpack_left`] on
+    /// the unit's action layer `actions`), then the rest by `by` ([`TornDown::let_go`]).
     ///
     /// # Errors
     ///
-    /// The Pack's part and what the rest lets go.
+    /// The Pack's and the Unpack's parts and what the rest lets go.
     pub(crate) fn let_go_own(
         &mut self,
         mut torn: TornDown,
@@ -302,6 +303,9 @@ impl Unit {
     ) -> GenieResult<()> {
         if let Some(pack) = torn.pack.take() {
             self.pack_left(pack, actions, step)?;
+        }
+        if let Some(status) = torn.unpack.take() {
+            self.unpack_left(status, actions, step)?;
         }
         torn.let_go(step, self, by)
     }
