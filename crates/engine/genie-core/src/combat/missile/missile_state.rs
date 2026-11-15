@@ -38,6 +38,17 @@ impl MissileState {
     }
 }
 
+/// Where a new missile's start (slot 5 with 1, `0x140a9c5b0`,
+/// [`crate::combat::missile::MissileAction::start`]) takes its action: the `set_state` it runs.
+#[must_use = "the start's set_state is its caller's to run"]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum MissileStart {
+    /// `set_state(1)`: it ends at once (the missile object's slot 0xd8, its hit points to 0).
+    Ends,
+    /// `set_state(3)`: it aims and launches toward its point, then flies.
+    Launches,
+}
+
 impl genie_diff::Diff for MissileState {
     fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
         differ.equal(self, other);

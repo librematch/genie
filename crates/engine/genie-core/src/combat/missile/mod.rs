@@ -44,7 +44,7 @@ pub use self::arc_ratio::ArcRatio;
 pub use self::hit_mode::{HitMode, TargetOwner};
 pub use self::miss_spread::MissSpread;
 pub use self::missile_modes::{SmartMode, VanishMode};
-pub use self::missile_state::MissileState;
+pub use self::missile_state::{MissileStart, MissileState};
 pub use self::missile_stats::MissileStats;
 pub use self::missile_target::{MissileTarget, MissileTargetId};
 pub use self::projectile_kind::ProjectileKind;
@@ -52,7 +52,7 @@ pub use self::shooter_id::{Shooter, ShooterId};
 pub use self::strike_result::StrikeResult;
 use crate::combat::{AttackCount, Firepower, MissileCount};
 use crate::math::image::missile::{
-    DRAW_SCALE as MISSILE_DRAW_SCALE, HALF as MISSILE_HALF,
+    DRAW_SCALE as MISSILE_DRAW_SCALE, HALF as MISSILE_HALF, NO_POINT as MISSILE_NO_POINT,
     VOLLEY_EPSILON as MISSILE_VOLLEY_EPSILON, VOLLEY_HALF as MISSILE_VOLLEY_HALF,
     VOLLEY_SCALE as MISSILE_VOLLEY_SCALE,
 };
@@ -69,6 +69,9 @@ pub const MISSILE: ActionKind = ActionKind::named(8);
 /// (`DAT_142e7f384`).
 const DRAW_SCALE: f32 = MISSILE_DRAW_SCALE;
 const HALF: f32 = MISSILE_HALF;
+/// The coordinate of no point (`DAT_14330ec20`, −1), which a new missile's start compares its
+/// point's x and y with (slot 5 with 1, `0x140a9c5c0`).
+const NO_POINT: f32 = MISSILE_NO_POINT;
 /// A volley's count takes the firepower past this hair (`FUN_141203140`).
 const VOLLEY_EPSILON: f32 = MISSILE_VOLLEY_EPSILON;
 /// A volley's scatter: the draw's scale and the half spread (`FUN_14120c0a0`).
@@ -370,10 +373,24 @@ pub fn aim(
 impl MissileAction {
     /// Slot 5 (`0x140a9c5b0`) with 0, as the action list's deletion restarts the next head
     /// (`FUN_140a98e20`): `set_state(4)` (`FUN_140a9de70`), which writes only the state: it
-    /// flies. With 1 (the list's add) the slot aims and launches it, which the volley does
-    /// itself ([`aim`], [`MissileAction::launch`]).
+    /// flies. With 1 the slot is [`MissileAction::start`]: the slot's `TEST DL, DL` parts the
+    /// two at its first instruction, and they share no code.
     pub const fn restart(&mut self) {
         self.state = MissileState::Flying;
+    }
+
+    /// Slot 5 (`0x140a9c5b0`) with 1, as the action list's add starts a new missile
+    /// (`FUN_140a977e0`): a missile without a target (`+0x20`) whose point's x (`+0x38`) or y
+    /// (`+0x3c`) is −1 ends at once ([`MissileStart::Ends`], `set_state(1)`); any other aims and
+    /// launches ([`MissileStart::Launches`], `set_state(3)`). Each compare is a `UCOMISS` whose
+    /// `JP` goes past its test, so a NaN coordinate is not −1. The point's height is not read.
+    /// With 0 the slot is [`MissileAction::restart`].
+    pub const fn start(&self) -> MissileStart {
+        if self.target.is_none() && (self.point.x() == NO_POINT || self.point.y() == NO_POINT) {
+            MissileStart::Ends
+        } else {
+            MissileStart::Launches
+        }
     }
 
     /// `set_state(3)` (`FUN_140a9de70` case 3) from `from` toward the aimed point: the way left
@@ -822,5 +839,56 @@ mod tests {
             Some(Point::new(f32::NAN, 10.0)),
         );
         assert_eq!(position, Position::new(12.0, 10.0, 1.0));
+    }
+
+    /// A new missile's action as its constructor leaves it (`FUN_140a9a040`): of `target`,
+    /// toward `point`, shooterless.
+    fn new_missile(target: Option<ObjectId>, point: Position) -> MissileAction {
+        MissileAction {
+            state: MissileState::New,
+            target: target.map(MissileTargetId::new),
+            fired_from: None,
+            point,
+            timer: Distance::ZERO,
+            direction: Offset::ZERO,
+            ballistic_velocity: Speed::ZERO,
+            ballistic_acceleration: Acceleration::ZERO,
+            distance: Distance::ZERO,
+            hit_mode: HitMode::TARGET_ALONE,
+            result: StrikeResult::None,
+            origin: Origin::NONE,
+            met: Vec::new(),
+        }
+    }
+
+    /// Slot 5 with 1 (`0x140a9c5b0`): a missile with a target launches toward any point, a
+    /// point of −1 too. One without a target ends at once toward a point whose x or y is −1
+    /// (`UCOMISS`, `JZ`), whatever its height; a NaN coordinate is not −1 (`JP` past its test),
+    /// so only the other one's −1 ends it.
+    #[test]
+    fn new_missile_without_target_ends_at_once_toward_point_of_minus_one() {
+        let start = |target, x, y| new_missile(target, Position::new(x, y, 0.0)).start();
+        let target = Some(object_id(50));
+        assert_eq!(start(target, -1.0, -1.0), MissileStart::Launches);
+        assert_eq!(start(target, 5.0, 5.0), MissileStart::Launches);
+        let nan = f32::NAN;
+        for (x, y, expected) in [
+            (-1.0, 5.0, MissileStart::Ends),
+            (5.0, -1.0, MissileStart::Ends),
+            (-1.0, -1.0, MissileStart::Ends),
+            (nan, -1.0, MissileStart::Ends),
+            (-1.0, nan, MissileStart::Ends),
+            (nan, 5.0, MissileStart::Launches),
+            (5.0, nan, MissileStart::Launches),
+            (nan, nan, MissileStart::Launches),
+            (5.0, 5.0, MissileStart::Launches),
+        ] {
+            assert_eq!(start(None, x, y), expected, "({x}, {y})");
+        }
+        // its height is not read
+        assert_eq!(
+            new_missile(None, Position::new(5.0, 5.0, -1.0)).start(),
+            MissileStart::Launches
+        );
     }
 }

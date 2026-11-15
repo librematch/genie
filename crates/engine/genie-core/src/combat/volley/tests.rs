@@ -4,6 +4,7 @@
 use crate::GenieResult;
 use crate::combat::damage::{Armored, Attacker, Kill, KillCount, Victim};
 use crate::combat::missile::Aimer;
+use crate::combat::missile::{MissileAction, MissileState};
 use crate::combat::stingers::{STINGER, StingerTask, stinger_tasks};
 use crate::combat::victims::KillLeft;
 use crate::combat::volley::{Aimed, Shot, VolleyEnd, armed, same_members, volleys};
@@ -13,9 +14,11 @@ use crate::map::Footprint;
 use crate::map::Position;
 use crate::map::Radii;
 use crate::map::{GroundOffset, Offset};
+use crate::math::rng::Stream;
 use crate::objects::HitPoints;
 use crate::objects::HpPowerup;
 use crate::objects::ListIndex;
+use crate::objects::MasterHitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::WorkerCount;
@@ -107,6 +110,50 @@ fn fire_at(world: &mut World, aimed: &Aimed) -> GenieResult<VolleyEnd> {
         0,
         |unit, _, step| unit.fire(step, aimed, &roles()),
     )
+}
+
+/// The archer's launch of a missile of master `shot_master` from (10, 10, 1) toward `point`,
+/// with itself as the shooter, at `aimed` in its update ([`Unit::launch`]).
+fn launch_at(
+    world: &mut World,
+    aimed: &Aimed,
+    shot_master: i16,
+    point: Position,
+) -> GenieResult<()> {
+    in_update(
+        world,
+        (PlayerId::new(1), ListIndex::new(0)),
+        0,
+        |unit, _, step| {
+            let master = unit
+                .master(step.world.master_tables(), step.player)?
+                .clone();
+            let shot = Shot {
+                made: master_id(shot_master),
+                at: Position::new(10.0, 10.0, 1.0),
+                point,
+                reach: Distance::new(10.0),
+                shooter: true,
+                aimer: Aimer {
+                    hit_chance: master.combat_part().hit_chance,
+                    spread: master.combat_part().missed_spread,
+                    class: master.class,
+                },
+                attack_count: AttackCount::ZERO,
+            };
+            unit.launch(step, aimed, &shot, &roles())
+        },
+    )
+}
+
+/// The one missile of the archer's player: its action and its hit points.
+fn new_missile(world: &World) -> (MissileAction, HitPoints) {
+    let [(id, _, _)] = missiles(world)[..] else {
+        panic!("not one missile: {:?}", missiles(world));
+    };
+    let missile = world.players[1].objects.by_id(object_id(id)).unwrap();
+    let action = world.parts.actions_of(missile.id).list.missile().unwrap();
+    (action.clone(), missile.life.hp)
 }
 
 /// The archer's volley's extra missile at `aimed`, unscattered, in its update
@@ -717,42 +764,75 @@ fn launch_fails_without_its_missile_master_or_the_ground_it_takes() {
         target: None,
         ..at_deer()
     };
-    let made = |world: &mut World, shot_master: i16| {
-        in_update(
-            world,
-            (PlayerId::new(1), ListIndex::new(0)),
-            0,
-            |unit, _, step| {
-                let master = unit
-                    .master(step.world.master_tables(), step.player)?
-                    .clone();
-                let shot = Shot {
-                    made: master_id(shot_master),
-                    at: Position::new(10.0, 10.0, 1.0),
-                    point: aimed.position,
-                    reach: Distance::new(10.0),
-                    shooter: true,
-                    aimer: Aimer {
-                        hit_chance: master.combat_part().hit_chance,
-                        spread: master.combat_part().missed_spread,
-                        class: master.class,
-                    },
-                    attack_count: AttackCount::ZERO,
-                };
-                unit.launch(step, &aimed, &shot, &roles())
-            },
-        )
-    };
     assert_eq!(
-        reason(made(&mut world, 999)).as_deref(),
+        reason(launch_at(&mut world, &aimed, 999, aimed.position)).as_deref(),
         Some("a shot whose missile master its player lacks")
     );
     world.recycling.missiles = vec![(object_id(-5), false)];
     world.spatial.terrain = None;
     assert_eq!(
-        reason(made(&mut world, 363)).as_deref(),
+        reason(launch_at(&mut world, &aimed, 363, aimed.position)).as_deref(),
         Some("a missile without the map's terrain")
     );
+}
+
+/// The list's add starts the new missile (slot 5 with 1, `0x140a9c5b0`). A shot without a
+/// target (as a fire at a point makes one, `FUN_141080650`) toward a point whose x is −1 ends at
+/// once (`set_state(1)`): its action in state 1, never aimed (no Action-stream draw) nor
+/// launched (no way, no direction), its hit points 0 (slot 0xd8, [`Unit::end_missile`]).
+#[test]
+fn targetless_launch_toward_point_of_minus_one_ends_at_once() {
+    let mut world = archer_world(100, 0, 0.0);
+    let untargeted = Aimed {
+        target: None,
+        ..at_deer()
+    };
+    let before = world.streams.get_mut(Stream::Action).draws;
+    assert_eq!(
+        launch_at(&mut world, &untargeted, 363, Position::new(-1.0, 14.0, 0.0)),
+        Ok(())
+    );
+    let (action, hp) = new_missile(&world);
+    assert_eq!(
+        (action.state, action.distance, action.direction, hp),
+        (
+            MissileState::Done,
+            Distance::ZERO,
+            Offset::ZERO,
+            HitPoints::ZERO
+        )
+    );
+    assert_eq!(world.streams.get_mut(Stream::Action).draws, before);
+}
+
+/// Any other new missile aims (one Action-stream draw) and launches (`set_state(3)`) from its
+/// place (10, 10, 1). Without a target toward (13, 14) it aims at the point itself: a way of
+/// √26. With the deer toward (−1, 14) it aims a third of the deer's height (1.5) up: a way of
+/// √137.25. Either keeps its hit points.
+#[test]
+fn launch_with_target_or_toward_point_of_its_own_aims_and_flies() {
+    let untargeted = Aimed {
+        target: None,
+        ..at_deer()
+    };
+    for (aimed, point, way) in [
+        (untargeted, Position::new(13.0, 14.0, 0.0), 26.0_f32),
+        (at_deer(), Position::new(-1.0, 14.0, 0.0), 137.25),
+    ] {
+        let mut world = archer_world(100, 0, 0.0);
+        let before = world.streams.get_mut(Stream::Action).draws;
+        assert_eq!(launch_at(&mut world, &aimed, 363, point), Ok(()));
+        let (action, hp) = new_missile(&world);
+        assert_eq!(
+            (action.state, action.distance, hp),
+            (
+                MissileState::Flying,
+                Distance::new(way.sqrt()),
+                HitPoints::of_master(MasterHitPoints::of_data(1))
+            )
+        );
+        assert_eq!(world.streams.get_mut(Stream::Action).draws, before + 1);
+    }
 }
 
 /// The launched missile holds its master's storage (slot 0x40's static storage): an entry of

@@ -332,6 +332,8 @@ pub mod missile {
     pub const DRAW_SCALE: f32 = f32::from_bits(0x46ff_fe00);
     /// 0.5
     pub const HALF: f32 = f32::from_bits(0x3f00_0000);
+    /// -1.0
+    pub const NO_POINT: f32 = f32::from_bits(0xbf80_0000);
     /// 1.0000000116860974e-07
     pub const VOLLEY_EPSILON: f32 = f32::from_bits(0x33d6_bf95);
     /// 0.5

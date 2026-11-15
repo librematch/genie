@@ -6,7 +6,8 @@ use crate::combat::missile::AimAt;
 use crate::combat::missile::MISSILE_TERRAIN_LACKING;
 use crate::combat::missile::ShooterId;
 use crate::combat::missile::{
-    Missile, MissileAction, MissileState, MissileTargetId, Origin, StrikeResult, aim, grounded,
+    Missile, MissileAction, MissileStart, MissileState, MissileStats, MissileTargetId, Origin,
+    StrikeResult, aim, grounded,
 };
 use crate::combat::volley::Aimed;
 use crate::combat::volley::Shot;
@@ -16,7 +17,7 @@ use crate::map::spatial::Placed;
 use crate::map::{Offset, Position};
 use crate::math::Angle;
 use crate::math::fmath::BVector;
-use crate::math::rng::Stream;
+use crate::math::rng::{Stream, Well512};
 use crate::movement::MoveState;
 use crate::movement::Mover;
 use crate::movement::Speed;
@@ -41,6 +42,7 @@ use crate::vision::SightShape;
 use crate::vision::visibility::{Seer, capture_kind};
 use crate::world::Seconds;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::MissileTuning;
 use crate::world::lets::take;
 use crate::world::parts::{Object, ObjectParts};
 use crate::world::slots::PlayerSlotsExt;
@@ -65,8 +67,10 @@ impl Unit {
     /// Then its action (`FUN_140a9a040`): the shot's point, the master's hit mode, the target taken
     /// (slot 0x178) and, with the shooter, the shooter taken too and its place, master and owner
     /// with the missile's radii as its origin (else none); the list's add starts it
-    /// (`FUN_140a9c5b0`): `set_state` 3 aims ([`crate::combat::missile::aim`], Action stream) and
-    /// launches ([`crate::combat::missile::MissileAction::launch`], its angle). The missile keeps
+    /// ([`MissileAction::start`], `0x140a9c5b0`): a shot without a target (a fire at a point's,
+    /// `FUN_141080650`, which genie does not port) toward a point whose x or y is −1 ends at once
+    /// ([`Unit::end_missile`]: no draw, its hit points 0); any other aims and launches, which
+    /// gives the missile its angle ([`Unit::start_new_missile`]). The missile keeps
     /// the object's id as what it was fired from, its reach and the object's attack count. Not
     /// held: the missile's sprite and pitch facet, and a shooter's own master copy (its origin's
     /// master −1).
@@ -247,27 +251,7 @@ impl Unit {
             },
             met: Vec::new(),
         };
-        let point = {
-            let draws = step.world.streams.get_mut(Stream::Action);
-            aim(
-                AimAt {
-                    point: action.point,
-                    from: position,
-                    target: Some((aimed.radius, aimed.class)),
-                    aimer: shot.aimer,
-                    master_id: made.id,
-                    attack_count: shot.attack_count,
-                    hit_mode: &mut action.hit_mode,
-                },
-                &mut || draws.rand15(),
-                roles,
-                &step.world.model.tuning.missile,
-            )?
-        };
-        if let Some(angle) = action.launch(position, point, &stats)? {
-            mover.angle = angle;
-        }
-        let missile = Self {
+        let mut missile = Self {
             id,
             life: Lifecycle {
                 class: Class::Animated,
@@ -286,6 +270,21 @@ impl Unit {
             my_pasture: None,
             ..Self::default()
         };
+        let new_start = NewMissileStart {
+            from: position,
+            aimed,
+            shot,
+            stats: &stats,
+        };
+        if let Some(angle) = missile.start_new_missile(
+            &mut action,
+            &new_start,
+            step.world.streams.get_mut(Stream::Action),
+            roles,
+            &step.world.model.tuning.missile,
+        )? {
+            mover.angle = angle;
+        }
         // it joins the end of its owner's list (slot 0x2d0, which files it in the tracker);
         // then its action takes the target and the shooter
         step.world.players.player_mut(step.player)?.tracker.add(
@@ -334,5 +333,66 @@ impl Unit {
             self.taken(None, id);
         }
         Ok(())
+    }
+}
+
+/// What a new missile's start reads besides its action and the Action stream
+/// ([`Unit::start_new_missile`]): its place, the shot's aim at its target, the shot and its
+/// master's flight.
+struct NewMissileStart<'shot> {
+    /// The new missile's place.
+    from: Position,
+    /// The aim at the shot's target: its radii and class, which the aim reads with a target.
+    aimed: &'shot Aimed,
+    /// The shot: its missile master, its aimer (the firing object's hit chance, spread and
+    /// class) and its attack count.
+    shot: &'shot Shot,
+    /// The missile master's flight.
+    stats: &'shot MissileStats,
+}
+
+impl Unit {
+    /// The list's add of the new missile `self`'s `action`: its slot 5 with 1
+    /// ([`MissileAction::start`]) and the `set_state` it chooses (`FUN_140a9de70`). Case 1 ends
+    /// it at once ([`Unit::end_missile`]). Case 3 aims from its place (`FUN_140a9c600`, [`aim`]:
+    /// the Action stream's draws; a target's height raises the point only with a target,
+    /// `+0x20`) and launches ([`MissileAction::launch`]), which gives the missile its angle.
+    ///
+    /// # Errors
+    ///
+    /// The aim's and the launch's.
+    fn start_new_missile(
+        &mut self,
+        action: &mut MissileAction,
+        new_start: &NewMissileStart<'_>,
+        draws: &mut Well512,
+        roles: &Roles,
+        missile_tuning: &MissileTuning,
+    ) -> GenieResult<Option<Angle>> {
+        match action.start() {
+            MissileStart::Ends => {
+                self.end_missile(action);
+                Ok(None)
+            }
+            MissileStart::Launches => {
+                let point = aim(
+                    AimAt {
+                        point: action.point,
+                        from: new_start.from,
+                        target: action
+                            .target
+                            .map(|_| (new_start.aimed.radius, new_start.aimed.class)),
+                        aimer: new_start.shot.aimer,
+                        master_id: new_start.shot.made,
+                        attack_count: new_start.shot.attack_count,
+                        hit_mode: &mut action.hit_mode,
+                    },
+                    &mut || draws.rand15(),
+                    roles,
+                    missile_tuning,
+                )?;
+                action.launch(new_start.from, point, new_start.stats)
+            }
+        }
     }
 }
