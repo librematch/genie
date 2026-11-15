@@ -9752,7 +9752,7 @@ fn unit_order_drop_off_takes_any_player_unit() {
 /// same run) does what the move from the world does (slot 0x340: the actions go, a `MoveTo` to
 /// the point), and both answer 1.
 #[test]
-fn the_ai_move_at_once_matches_the_one_after_the_update() {
+fn ai_move_at_once_matches_the_move_from_the_world_and_both_answer_1() {
     let mut later = sent_off_world(vec![]);
     later.parts.put_mover(
         later.players[1].objects[ListIndex::new(0)].id,

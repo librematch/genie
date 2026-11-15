@@ -153,9 +153,10 @@ impl Unit {
     /// (also its move off a footprint, [`crate::world::World::move_aside`]), the unit of `class` of
     /// player `player`: a trebuchet packs or stays ([`trebuchet_move`]), any other unit moves
     /// (`FUN_1410866e0`, which answers 1). Without `ai_move.force` a head `MoveTo` whose point
-    /// (`+0x38`..`+0x40`, [`MoveToAction::point`]) is `ai_move.point` stands: the move is done. Then the head action's slot 0x40 may take the point
-    /// ([`Unit::head_takes_point`]; the target it lets go into `releases` and a counted repairer's
-    /// building into `builder_leaves`, by `by`). Otherwise a `MoveTo` to `ai_move.point` within
+    /// (`+0x38`..`+0x40`, [`MoveToAction::point`]) is `ai_move.point` stands: the move is done.
+    /// Then the head action's slot 0x40 may take the point ([`Unit::head_takes_point`]; the
+    /// target it lets go into `releases` and a counted repairer's building into
+    /// `builder_leaves`, by `by`). Otherwise a `MoveTo` to `ai_move.point` within
     /// `ai_move.range` is made (`FUN_140aa0d30`, the master's walking sprite with [`Pace::Walk`],
     /// else its running one; the sprite is not held), which replaces the action list
     /// (`FUN_140a98620`, then slot 0x808): the caller installs it with the unit's step or the

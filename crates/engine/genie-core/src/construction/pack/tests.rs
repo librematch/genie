@@ -1,9 +1,13 @@
 //! The Pack's tests on player 1's trebuchet 700 (master 42) and player 2's villager 800.
 
 use super::*;
+use crate::combat::AttackTargetId;
+use crate::combat::attack::tests::own_attack;
+use crate::combat::attack::{Attack, AttackState};
 use crate::commands::QueueId;
 use crate::construction::Annexes;
 use crate::construction::unpack::{UnpackAction, UnpackState, UnpackStatus};
+use crate::gathering::hunt::tests::walker;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GroundOffset;
@@ -11,6 +15,7 @@ use crate::map::Point;
 use crate::map::Position;
 use crate::map::spatial::Placed;
 use crate::movement::Speed;
+use crate::movement::move_to::{MOVE_TO, MoveToAction};
 use crate::objects::FacetCount;
 use crate::objects::Graphics;
 use crate::objects::HitPoints;
@@ -21,6 +26,7 @@ use crate::objects::RoleId;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
+use crate::objects::Voice;
 use crate::objects::WorkRate;
 use crate::objects::actions::Action as ListAction;
 use crate::objects::actions::ActionList;
@@ -73,6 +79,7 @@ use crate::world::World;
 use crate::world::WorldTime;
 use crate::world::tests::{delete_head_at, in_update, wait_over};
 use crate::world::unread::UNREAD_ACTION;
+use std::iter::once;
 use std::sync::Arc;
 
 /// The trebuchet's id.
@@ -1372,33 +1379,96 @@ fn from_step(world: &mut World) -> GenieResult<Answer> {
 /// Both paths of slot 0x340.
 const SLOT_PATHS: [SlotPath; 2] = [from_world, from_step];
 
-/// `FUN_141216c50` on an unpacked trebuchet (class 54) under no Pack or Unpack: a Pack of its
-/// own (`FUN_140ad4ff0` with −1) through slot 0x808, started at work, in place of the move,
-/// and the answer 0 (`0x141216eb0`). Its constructor gives the unit AI the order 0x2db (the
-/// attack order the last) and the action 0x277; the building shows its construction sprite, a
-/// new instance; no `MoveTo` is made. Both the world's and the step's path.
+/// The trebuchet's Attack on the villager, waiting to swing (state 6) within its weapon range 16.
+fn attack_on_villager() -> Attack {
+    Attack {
+        target: Some(AttackTargetId::new(TARGET)),
+        ..own_attack(-1, AttackState::Ready, Distance::new(16.0))
+    }
+}
+
+/// The lists of a trebuchet whose head is an action that neither packs nor unpacks
+/// (`FUN_141216c50`'s head test at `0x141216dc4` fails after its null test at `0x141216dbb`): its
+/// Attack on the villager, and a `MoveTo` of its own to [`NEAR`].
+fn other_heads() -> [ActionList; 2] {
+    [
+        ActionList::default().with_attack(Some(attack_on_villager())),
+        ActionList::default().with_move_to(Some(MoveToAction::to_point(
+            NEAR,
+            Distance::ZERO,
+            None,
+        ))),
+    ]
+}
+
+/// `FUN_141216c50` on an unpacked trebuchet (class 54) under no Pack or Unpack (an empty list, an
+/// Attack or a `MoveTo` at its head): a Pack of its own (`FUN_140ad4ff0` with −1) through slot
+/// 0x808, started at work, in place of the move and of the list, and the answer 0
+/// (`0x141216eb0`). Its constructor gives the unit AI the order 0x2db (the attack order the last)
+/// and the action 0x277; the building shows its construction sprite, a new instance; no `MoveTo`
+/// is made. Both the world's and the step's path.
 #[test]
 fn ai_move_of_class_54_installs_its_pack_and_answers_0() {
     for path in SLOT_PATHS {
-        let mut world = mapped(ActionList::default(), PlayerKind::Human, FAR);
-        world.players[1].objects[AT.1].sprite =
-            Some(ActiveSprite::at_rest(graphic(STANDING), Frame::of_data(4)));
-        world.parts.actions_mut(TREBUCHET).unwrap().pack_progress = PackProgress::of_data(40);
-        attacking_ai(&mut world, None);
-        assert_eq!(path(&mut world), Ok(Answer::NotTaken));
-        assert_eq!(
-            world.parts.actions_of(TREBUCHET).list,
-            packing(installed(None))
-        );
-        assert_eq!(
-            ai_orders(&world),
-            (
-                Some(OrderKind::OnTarget),
-                Some(OrderKind::Attack),
-                Some(AiAction::OnTarget)
-            )
-        );
-        assert_eq!(shown(&world), Some((PACKING, 0)));
+        for list in once(ActionList::default()).chain(other_heads()) {
+            let head = list.head().map(ListAction::kind);
+            let mut world = mapped(list, PlayerKind::Human, FAR);
+            world.players[1].objects[AT.1].sprite =
+                Some(ActiveSprite::at_rest(graphic(STANDING), Frame::of_data(4)));
+            world.parts.actions_mut(TREBUCHET).unwrap().pack_progress = PackProgress::of_data(40);
+            attacking_ai(&mut world, None);
+            assert_eq!(path(&mut world), Ok(Answer::NotTaken), "{head:?}");
+            assert_eq!(
+                world.parts.actions_of(TREBUCHET).list,
+                packing(installed(None)),
+                "{head:?}"
+            );
+            assert_eq!(
+                ai_orders(&world),
+                (
+                    Some(OrderKind::OnTarget),
+                    Some(OrderKind::Attack),
+                    Some(AiAction::OnTarget)
+                ),
+                "{head:?}"
+            );
+            assert_eq!(shown(&world), Some((PACKING, 0)), "{head:?}");
+        }
+    }
+}
+
+/// `FUN_141216c50` on a packed trebuchet (class 51) whose head neither packs nor unpacks (an
+/// Attack or a `MoveTo` at its head): it moves and answers 1 (`FUN_1410866e0` at `0x141216ee6`:
+/// the head's slot 0x40 declines the point, and a `MoveTo` of its own to the point replaces the
+/// list). No Pack is made, and the unit AI's order and action stay: slot 0x340 writes neither.
+/// Both the world's and the step's path.
+#[test]
+fn ai_move_of_class_51_under_another_head_moves_and_answers_1() {
+    for path in SLOT_PATHS {
+        for list in other_heads() {
+            let head = list.head().map(ListAction::kind);
+            let mut world = mapped(list, PlayerKind::Human, FAR);
+            world.players[1].objects[AT.1].life.master_id = ids::ID_331;
+            world.parts.put_mover(TREBUCHET, Some(walker()));
+            attacking_ai(&mut world, None);
+            assert_eq!(path(&mut world), Ok(Answer::Taken), "{head:?}");
+            let list = &world.parts.actions_of(TREBUCHET).list;
+            assert_eq!(
+                list.iter().map(ListAction::kind).collect::<Vec<_>>(),
+                [MOVE_TO],
+                "{head:?}"
+            );
+            assert_eq!(
+                list.move_to().map(|move_to| (move_to.point, move_to.voice)),
+                Some((FAR, Voice::Loud)),
+                "{head:?}"
+            );
+            assert_eq!(
+                ai_orders(&world),
+                (Some(OrderKind::Attack), None, Some(AiAction::Attack)),
+                "{head:?}"
+            );
+        }
     }
 }
 
