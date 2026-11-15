@@ -24,8 +24,12 @@ impl BuildAction {
     /// (`owner`) is the builder's player (`builder`: the two players' `+0x718`) gives the point its
     /// place, and becomes the target (`FUN_140a7a230`) unless it is past [`LAST_TAKEN`]; another
     /// player's leaves the target none and the point at (0, 0, 0). The take of a held target (slot
-    /// 0x178) is the caller's. The game's constructor leaves the state 0, which nothing reads
-    /// before the install's start ([`Unit::start_build`]); genie holds 3 until then.
+    /// 0x178) is the caller's. The routine also tests the foundation for null (`0x140aad52c`),
+    /// which no caller passes, so `foundation` is a [`Unit`]. The factory hands a call without a
+    /// target to the point constructor (`FUN_140aad470`, `0x140aca517`). The build command returns
+    /// first on an object the world lacks (`0x14120d438`). The game's constructor leaves the state
+    /// 0, which nothing reads before the install's start ([`Unit::start_build`]); genie holds 3
+    /// until then.
     #[must_use]
     pub fn new(task: BuildTask, builder: PlayerId, owner: PlayerId, foundation: &Unit) -> Self {
         let (target, point) = if owner == builder {
