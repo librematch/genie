@@ -158,24 +158,6 @@ impl Unit {
         })
     }
 
-    /// The Build's slot 0x28 with 0 (`0x140aadd80`), as the action list's deletion restarts it
-    /// at the head (`FUN_140a98e20`): `set_state(3)` ([`BuildAction::idle`]) on its foundation
-    /// and its unit AI's build orders as the player holds them now.
-    ///
-    /// # Errors
-    ///
-    /// A player the world lacks, and [`BuildAction::idle`]'s.
-    pub(crate) fn restart_build(
-        &mut self,
-        build_action: &mut BuildAction,
-        step: &mut Step<'_>,
-    ) -> GenieResult<()> {
-        let others = OthersRef::of(&step.world.players, &step.world.index, step.player)?;
-        let site = construction_site(&step.world.parts.building, others.own(build_action.target));
-        let build_targets = build_order_states(step.world.parts.unit_ai.get(self.id), others);
-        build_action.idle(step, self, site, &build_targets)
-    }
-
     /// State 8: what the drop-off reads of its drop site `site`: its state, whether it takes
     /// what the builder carries and the gap between their footprints; none without the site.
     fn build_deposit(
@@ -246,7 +228,7 @@ impl Unit {
 
 /// The foundation `foundation` as the Build works it ([`BuildReads::site`]): an object with its
 /// construction in `buildings`, none else.
-fn construction_site(
+pub(super) fn construction_site(
     buildings: &PartTable<Building>,
     foundation: Option<&Unit>,
 ) -> Option<FoundationId> {
@@ -258,7 +240,7 @@ fn construction_site(
 /// The foundation and its state of each build order queued in the unit AI `ai`
 /// ([`BuildReads::build_targets`]), as the owner holds it (`others`): None for one it does not
 /// hold.
-fn build_order_states(
+pub(super) fn build_order_states(
     ai: Option<&UnitAi>,
     others: OthersRef<'_>,
 ) -> Vec<(Option<ObjectId>, Option<ObjectState>)> {

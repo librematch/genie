@@ -14755,6 +14755,78 @@ fn deleted_head_over_repair_leaves_the_repairers_of_the_counted_object() {
     }
 }
 
+/// A Repair that holds no target, at town centre 9149's place, waiting.
+fn repair_without_target() -> RepairAction {
+    RepairAction {
+        target: None,
+        state: RepairState::Idle,
+        point: Position::new(20.0, 20.0, 0.0),
+        timer: Seconds::ZERO,
+        task: RepairTask::of(&Task::default()),
+        range: Distance::ZERO,
+        counted: false,
+        voice: Voice::Loud,
+    }
+}
+
+/// The install (slot 0x808) of a Build whose constructor took no target (`FUN_140aad4e0` on
+/// another player's foundation) over a wait above a Repair: the deletion runs first, the wait
+/// goes and the Repair under it restarts with 0 (notify 0x202 with the repair's action value),
+/// then the Repair goes. The add's start (slot 0x28 with 1, `0x140aadd80` without a target)
+/// follows it and waits for work (`set_state(3)`): notify 0x202 with the build's action value,
+/// and the standing sprite takes the top speed back to its base.
+#[test]
+fn install_of_build_without_target_waits_for_work_after_the_deletion() {
+    let mut world = walking_villager_holding(wait_over(
+        ActionList::default().with_repair(Some(repair_without_target())),
+    ));
+    let build = BuildAction {
+        target: None,
+        point: Position::ORIGIN,
+        ..build_of_foreign_foundation(BuildState::Idle, false)
+    };
+    world
+        .install_build(PlayerId::new(1), ListIndex::new(2), build)
+        .unwrap();
+    let list = &world.parts.actions_of(object_id(40)).list;
+    assert_eq!((list.build().copied(), list.repair()), (Some(build), None));
+    assert_eq!(
+        villager_heard(&world),
+        [
+            (
+                NotifyKind::REQUIRES_SEARCH,
+                [AiAction::Repair.value(), 0, 0]
+            ),
+            (NotifyKind::REQUIRES_SEARCH, [AiAction::Build.value(), 0, 0])
+        ]
+    );
+    assert_eq!(villager_speeds(&world), (Speed::new(0.8), Speed::new(1.0)));
+}
+
+/// The install of a Repair that holds no target (the factory's constructor without one,
+/// `FUN_140ad7f20`): the add's start (slot 0x28 with 1, `FUN_140ad9030`) waits for work
+/// (`set_state(3)`): its unit AI hears notify 0x202 with the repair's action value and the
+/// standing sprite takes the top speed back to its base; the point stays.
+#[test]
+fn install_of_repair_without_target_waits_for_work() {
+    let mut world = walking_villager_holding(ActionList::default());
+    world
+        .install_repair(PlayerId::new(1), ListIndex::new(2), repair_without_target())
+        .unwrap();
+    assert_eq!(
+        world.parts.actions_of(object_id(40)).list.repair().copied(),
+        Some(repair_without_target())
+    );
+    assert_eq!(
+        villager_heard(&world),
+        [(
+            NotifyKind::REQUIRES_SEARCH,
+            [AiAction::Repair.value(), 0, 0]
+        )]
+    );
+    assert_eq!(villager_speeds(&world), (Speed::new(0.8), Speed::new(1.0)));
+}
+
 /// A deleted head over a Fly restarts it with 0 (`0x140a84900`): only `set_state(3)`
 /// (`0x140a84a50`): a `MoveTo` it flew goes and stops the unit (one resting leaves it moving),
 /// and the flight's time is drawn once from the Action stream; its sprite and its unit AI are

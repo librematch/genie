@@ -1,15 +1,15 @@
-//! The Build action's start (state 4 toward the foundation) and its update, which runs the
-//! action's state; the AI's build orders whose foundation is gone.
+//! The Build action's update, which runs the action's state, and its `set_state(4)` toward the
+//! foundation; the AI's build orders whose foundation is gone.
 
 use crate::combat::attack::Aim;
 use crate::combat::attack::face_target;
 use crate::construction::FoundationId;
 use crate::construction::build::BuildState;
-use crate::construction::build::{BUILDER_UNMOVING, BuildAction, BuildReads, BuildTask};
+use crate::construction::build::{BUILDER_UNMOVING, BuildAction, BuildReads};
 use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::movement::Me;
-use crate::movement::move_to::{GiveUp, MoveToAction, MoveToReads, WalkTo};
+use crate::movement::move_to::{GiveUp, MoveToAction};
 use crate::movement::move_to::{Patience, SubCode};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -25,41 +25,16 @@ use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
-use crate::world::layer::generated::MoveToTuning;
 use crate::world::lets::release;
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 use crate::{GenieError, GenieResult};
 
 impl BuildAction {
-    /// The action's start (slot 5, `0x140aadd80`) on the foundation `to`: state 4, whose
-    /// `set_state` (`0x140aae200`) takes the foundation's place as the point and makes the
-    /// `MoveTo` to it ([`BuildTask::walk`] with what it reads of the builder, `move_reads`).
-    ///
-    /// # Errors
-    ///
-    /// A sprite the table lacks.
-    pub fn start(
-        to: WalkTo,
-        task: BuildTask,
-        move_reads: &MoveToReads<'_>,
-        move_to_tuning: &MoveToTuning,
-    ) -> GenieResult<Self> {
-        Ok(Self {
-            target: to.id.map(FoundationId::new),
-            state: BuildState::Move {
-                move_to: task.walk(move_reads, Some(to), move_to_tuning)?,
-            },
-            point: to.at,
-            task,
-            added: false,
-            timer: Seconds::ZERO,
-            site: None,
-        })
-    }
-
     /// `set_state(4)` (and slot 0x48 or 0x68 before it) on `target` at `at`, with the `MoveTo`
     /// its case 4 makes ([`BuildTask::walk`]); the second target and the timer stay.
+    ///
+    /// [`BuildTask::walk`]: crate::construction::build::BuildTask::walk
     #[must_use]
     pub(super) const fn restarted(
         &self,

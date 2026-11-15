@@ -1,6 +1,7 @@
 //! A builder's Build action (`TRIBE_Action_Build`, type 101, vtable `0x142ed6628`) up to the
-//! builder's walk: the action starts in state 4 with a `MoveTo` sub-action (`RGE_Action_Move_To`,
-//! type 1) toward the foundation; a builder already at the foundation works in its first update
+//! builder's walk: the install's start takes state 4 with a `MoveTo` sub-action
+//! (`RGE_Action_Move_To`, type 1) toward the foundation, or waits for work (state 3) where the
+//! constructor took none; a builder already at the foundation works in its first update
 //! (state 6). A walking builder's `MoveTo` runs the motion step ([`crate::movement`]).
 //!
 //! A builder at a foundation faces it and joins its work (state 7): at a foundation no one started
@@ -48,6 +49,7 @@ mod construction;
 mod drop_off;
 pub(crate) mod more_work;
 mod placing;
+mod start;
 mod states;
 pub(crate) mod unit;
 mod unit_ai_side;

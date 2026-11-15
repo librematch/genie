@@ -416,8 +416,8 @@ impl Unit {
     /// ([`Unit::restart_gather`]). A unit's own Attack (`0x140a7f8c0`) fails without a unit AI
     /// or inside an object, else starts again as the list's add starts it but for the attack
     /// count's clear ([`Unit::start_listed_attack`] with [`HeadStart::Restarted`]). The Build's
-    /// (`0x140aadd80`, [`Unit::restart_build`]), the Repair's (`FUN_140ad9030`,
-    /// [`Unit::restart_repair`]) and the Fly's (`0x140a84900`, [`Fly::restart`]) take
+    /// (`0x140aadd80`, [`Unit::start_build`]), the Repair's (`FUN_140ad9030`,
+    /// [`Unit::start_repair`]) and the Fly's (`0x140a84900`, [`Fly::restart`]) take
     /// `set_state(3)` with 0. Nothing for an empty list.
     ///
     /// [`MakeAction::first`]: crate::gathering::make::MakeAction::first
@@ -467,8 +467,12 @@ impl Unit {
             Some(&mut Action::Attack(attack)) => {
                 self.start_listed_attack(attack, HeadStart::Restarted, actions, step)
             }
-            Some(Action::Build(build_action)) => self.restart_build(build_action, step),
-            Some(Action::Repair(repair_action)) => self.restart_repair(repair_action, step),
+            Some(Action::Build(build_action)) => {
+                self.start_build(build_action, HeadStart::Restarted, step)
+            }
+            Some(Action::Repair(repair_action)) => {
+                self.start_repair(repair_action, HeadStart::Restarted, step)
+            }
             Some(Action::Fly(fly)) => fly.restart(self, step),
         }
     }

@@ -527,8 +527,9 @@ pub(crate) fn graphics() -> Graphics {
         .into()
 }
 
-/// A Build started on the foundation `id` (state 0) at `at`, `gap` from its builder (state 2,
-/// speed 1, no default sprites), with `task` ([`BuildAction::start`]).
+/// A Build on the foundation `id` (state 0) at `at`, `gap` from its builder (state 2, speed 1,
+/// no default sprites), with `task`, as the install's start leaves it (slot 0x28 with 1,
+/// `set_state(4)`): the foundation's place its point, its `MoveTo` to it ([`BuildTask::walk`]).
 pub(crate) fn started(id: ObjectId, at: Position, gap: Distance, task: BuildTask) -> BuildAction {
     started_on(Some(id), at, gap, task)
 }
@@ -557,7 +558,17 @@ pub(crate) fn started_on(
         gap,
         state: Some(ObjectState::Foundation),
     };
-    BuildAction::start(to, task, &move_reads, &tuning().move_to).unwrap()
+    BuildAction {
+        target: id.map(FoundationId::new),
+        state: BuildState::Move {
+            move_to: task.walk(&move_reads, Some(to), &tuning().move_to).unwrap(),
+        },
+        point: at,
+        task,
+        added: false,
+        timer: Seconds::ZERO,
+        site: None,
+    }
 }
 
 /// A Build's start (`0x140aadd80`, `set_state(4)`) takes the task's moving sprite for its

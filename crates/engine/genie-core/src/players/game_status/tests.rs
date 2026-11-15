@@ -8,7 +8,8 @@ use crate::construction::build::BuildTask;
 use crate::construction::build::tests::started_on;
 use crate::construction::repair::REPAIR;
 use crate::construction::repair::RepairState;
-use crate::construction::repair::{RepairAction, RepairTask};
+use crate::construction::repair::RepairTask;
+use crate::construction::repair::tests::walking_to;
 use crate::gathering::PastureId;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::{GatherAction, Resource, StopRate};
@@ -80,7 +81,6 @@ use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
-use crate::testing::tuning;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAi;
@@ -346,30 +346,26 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
             ..Unit::default()
         },
         Action {
-            list: ActionList::default().with_repair(Some(
-                RepairAction::start(
-                    WalkTo {
-                        id: None,
-                        at: Position::new(3.5, 3.5, 0.0),
-                        gap: Distance::new(NO_TARGET_GAP),
-                        state: None,
+            list: ActionList::default().with_repair(Some(walking_to(
+                WalkTo {
+                    id: None,
+                    at: Position::new(3.5, 3.5, 0.0),
+                    gap: Distance::new(NO_TARGET_GAP),
+                    state: None,
+                },
+                repair_task,
+                Distance::ZERO,
+                &MoveToReads {
+                    sprites: SpriteReads {
+                        defaults: MoveDefaults::default(),
+                        graphics: &Graphics::new(),
                     },
-                    repair_task,
-                    Distance::ZERO,
-                    &MoveToReads {
-                        sprites: SpriteReads {
-                            defaults: MoveDefaults::default(),
-                            graphics: &Graphics::new(),
-                        },
-                        state: ObjectState::Alive,
-                        speed: Speed::new(1.0),
-                        at: Position::new(3.5, 3.5, 0.0),
-                        ground: Footprint::new(0.2, 0.2),
-                    },
-                    &tuning().move_to,
-                )
-                .unwrap(),
-            )),
+                    state: ObjectState::Alive,
+                    speed: Speed::new(1.0),
+                    at: Position::new(3.5, 3.5, 0.0),
+                    ground: Footprint::new(0.2, 0.2),
+                },
+            ))),
             ..Default::default()
         },
     ));

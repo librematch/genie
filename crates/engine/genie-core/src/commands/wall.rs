@@ -16,7 +16,7 @@
 use crate::commands::QueueId;
 use crate::commands::UnitList;
 use crate::construction::FoundationId;
-use crate::construction::build::BuildAction;
+use crate::construction::build::BuildTask;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
@@ -395,7 +395,7 @@ impl World {
                     && (!build_wall_command.commits || !ai.has_unready_order())
             });
         if direct {
-            let task: (MasterId, BuildAction) =
+            let task: (MasterId, BuildTask) =
                 self.build_task(player_id, id, (player, foundation, master), at)?;
             self.build_directly(player_id, idx, task, (player, foundation, master), at)?;
         } else {

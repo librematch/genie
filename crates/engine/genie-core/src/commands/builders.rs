@@ -10,8 +10,6 @@ use crate::map::Distance;
 use crate::map::Position;
 use crate::math::fmath::below_or_unordered;
 use crate::math::rng::Stream;
-use crate::movement::footprint_gap;
-use crate::movement::move_to::{MoveToReads, WalkTo};
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
@@ -46,6 +44,12 @@ use crate::world::index::Place;
 use crate::world::slots::PlayerSlotsExt;
 use crate::world::{STATIC_KINDS_END, World};
 use crate::{GenieError, GenieResult};
+
+/// The foundation of a builder's direct path that the world does not hold: its callers made it
+/// just before (BUILD's [`World::found`], the wall's placement, a farm's reseed), and the game's
+/// slot 0x128 takes the object itself.
+const FOUNDATION_UNHELD: GenieError =
+    GenieError::unreachable("a directly built foundation that the world does not hold");
 
 impl World {
     /// BUILD's builders (the cost was paid with the foundation, [`World::found`]; the pending
@@ -165,16 +169,17 @@ impl World {
 
     /// What slot 0x128 on `foundation` (of `master`, player `fp`'s, at `position`) takes for the
     /// builder `id` of player `player_id`: the master it builds with ([`work_master`], with
-    /// `player_id`'s masters and attributes) and the Build action of that master's task. A builder
-    /// whose action would be replaced, without a Build task for it or with one not enabled, is
-    /// not modelled.
+    /// `player_id`'s masters and attributes) and what its Build takes of that master's task
+    /// ([`BuildTask::of`] with the master's work rate and the unit's powerup). A builder whose
+    /// action would be replaced, without a Build task for it or with one not enabled, is not
+    /// modelled.
     pub(crate) fn build_task(
         &self,
         player_id: PlayerId,
         id: ObjectId,
         (fp, foundation, master): (PlayerId, FoundationId, MasterId),
         position: Position,
-    ) -> GenieResult<(MasterId, BuildAction)> {
+    ) -> GenieResult<(MasterId, BuildTask)> {
         let masters = self
             .model
             .masters
@@ -248,29 +253,11 @@ impl World {
                 "a builder whose Build task is not enabled",
             ));
         }
-        let to = WalkTo {
-            id: Some(foundation.id()),
-            at: position,
-            gap: footprint_gap(unit.position(), builder.radius, position, site.radius),
-            state: self.object_state(foundation),
-        };
         let task = BuildTask::of(
             task,
             builder.action_part().work_rate + self.parts.combat_of(unit.id).work_rate_powerup,
         );
-        // the sprites its MoveTo's constructor takes for none (FUN_140aa0df0)
-        let move_reads = MoveToReads::of(
-            unit,
-            self.top_speed(player_id, unit)?,
-            builder,
-            &self.model.graphics,
-            self.parts.combat_of(unit.id).abilities.look.as_ref(),
-            &self.model.roles,
-        );
-        Ok((
-            builder.id,
-            BuildAction::start(to, task, &move_reads, &self.model.tuning.move_to)?,
-        ))
+        Ok((builder.id, task))
     }
 
     /// The queue path of a builder at `idx` of player `player_id` (slot 0x30 into slot 0x28): its
@@ -315,17 +302,23 @@ impl World {
     /// The direct path of a builder at `idx` of player `player`, slot 0x128 on `foundation` (player
     /// `fp`'s) at `position` with what [`World::build_task`] found: its ignore list empties
     /// (`FUN_141197da0`), the town-bell record (slot 0x7e8 with task filter −1), then the work
-    /// command (`FUN_14106ff70`): the master changes, the Build takes its foundation, the unit
-    /// AI's notify, the action list clears and holds the Build.
+    /// command (`FUN_14106ff70`): the master changes, the Build ([`BuildAction::new`] on the
+    /// foundation as the world holds it) takes its foundation where it holds it, the unit AI's
+    /// notify, the action list clears, holds the Build and starts it
+    /// ([`World::install_build`]).
     pub(crate) fn build_directly(
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        (with, build): (MasterId, BuildAction),
+        (with, task): (MasterId, BuildTask),
         (fp, foundation, master): (PlayerId, FoundationId, MasterId),
         position: Position,
     ) -> GenieResult<()> {
         let site_class = self.master(fp, master)?.class;
+        // the constructor reads only the foundation and the builder's player, which the
+        // master change below leaves as they are
+        let (owner, site) = self.object(foundation).ok_or(FOUNDATION_UNHELD)?;
+        let build = BuildAction::new(task, player, owner, site);
         if let Some(mover) = self.parts.mover_mut(self.players.live(player, idx)?.id) {
             mover.ignore_units.clear();
         }
@@ -333,11 +326,14 @@ impl World {
         // flag cleared (FUN_1412067f0)
         self.town_bell_order(player, idx, foundation.id(), None)?;
         // the work command (FUN_14106ff70): the master changes (slot 0x90, its action list
-        // cleared); the Build action takes its foundation (FUN_140a7a230, slot 0x178)
+        // cleared); the Build action takes its foundation where it holds it (FUN_140a7a230,
+        // slot 0x178)
         if self.players.live(player, idx)?.life.master_id != with {
             self.change_master(player, idx, with, ActionsOnChange::Clear)?;
         }
-        self.take(foundation.id(), self.releaser(player, idx)?)?;
+        if build.target.is_some() {
+            self.take(foundation.id(), self.releaser(player, idx)?)?;
+        }
         // the work command's notify (slot 0x828): the build order and the foundation, with
         // the point slot 0x128 passes (BUILD's x and y, on the ground)
         let unit = self.players.live_mut(player, idx)?;
@@ -353,14 +349,8 @@ impl World {
             self.remember_order(player, idx, (Some(OrderKind::Build), Some(AiAction::Build)))?;
         }
         // the install (slot 0x808): the action list clears (its actions' teardowns), then
-        // holds the Build
-        if let Some(build) = self.set_only_action(player, idx, Some(build))? {
-            self.parts
-                .actions_mut(self.players.live(player, idx)?.id)?
-                .list
-                .set_build(Some(build));
-        }
-        Ok(())
+        // holds the Build and starts it
+        self.install_build(player, idx, build)
     }
 
     /// The unit's slot 0x388 (`FUN_141226fc0`) after its unit AI's update, with what it found
@@ -393,15 +383,11 @@ impl World {
     /// 0x48, [`World::build_take`]); without one its slot 0x820 with any action type and the switch
     /// ([`task_search`] on the foundation and its main building; the switch, slot 0x90 with 0,
     /// [`World::change_master`]) finds a task, and a Build action on it (`FUN_140aad4e0` with that
-    /// task, whatever its type) replaces the unit's actions (slot 0x808,
-    /// [`World::set_only_action`]). [`Answer::Taken`] when it builds (slot 0x380's 1);
+    /// task, whatever its type: [`BuildAction::new`]) replaces the unit's actions and starts
+    /// (slot 0x808, [`World::install_build`]). [`Answer::Taken`] when it builds (slot 0x380's 1);
     /// [`Answer::NotTaken`] for the foundation gone or no task (its 0, which the Gather's
     /// `set_state(6)` ignores and `BuildObject` reads first,
     /// [`crate::unit_ai::world_view::UnitView::builds`]).
-    #[expect(
-        clippy::too_many_lines,
-        reason = "the build command (slot 0x380, `FUN_14120d410`) ported as one function, its branches in the game's order"
-    )]
     pub(crate) fn build_command(
         &mut self,
         player: PlayerId,
@@ -422,10 +408,7 @@ impl World {
         }
         let gone = FOUNDATION_GONE;
         let (fp, foundation_unit) = self.object(foundation).ok_or_else(|| gone.clone())?;
-        let (site, foundation_at) = (
-            foundation_unit.master(self.master_tables(), fp)?,
-            foundation_unit.position(),
-        );
+        let foundation_at = foundation_unit.position();
         let find = |id: ObjectId| self.object(id);
         let task_target = task_target_with(
             foundation.id(),
@@ -484,40 +467,20 @@ impl World {
             return Ok(Answer::NotTaken);
         };
         let builder = switch.unwrap_or(actor.master);
-        let to = WalkTo {
-            id: Some(foundation.id()),
-            at: foundation_at,
-            gap: footprint_gap(unit.position(), builder.radius, foundation_at, site.radius),
-            state: Some(foundation_unit.life.state),
-        };
-        let move_reads = MoveToReads::of(
-            unit,
-            self.top_speed(player, unit)?,
-            builder,
-            &self.model.graphics,
-            self.parts.combat_of(unit.id).abilities.look.as_ref(),
-            &self.model.roles,
+        let task = BuildTask::of(
+            &task,
+            builder.action_part().work_rate + self.parts.combat_of(unit.id).work_rate_powerup,
         );
-        let build = BuildAction::start(
-            to,
-            BuildTask::of(
-                &task,
-                builder.action_part().work_rate + self.parts.combat_of(unit.id).work_rate_powerup,
-            ),
-            &move_reads,
-            &self.model.tuning.move_to,
-        )?;
+        // FUN_140aad4e0 reads only the foundation and the builder's player, which the switch
+        // below leaves as they are
+        let build = BuildAction::new(task, player, fp, foundation_unit);
         if let Some(master_id) = switch.map(|master| master.id) {
             self.change_master(player, idx, master_id, ActionsOnChange::Clear)?;
         }
-        self.take(foundation.id(), self.releaser(player, idx)?)?;
-        if let Some(build) = self.set_only_action(player, idx, Some(build))? {
-            self.parts
-                .actions
-                .of_mut(self.players.live(player, idx)?.id)?
-                .list
-                .set_build(Some(build));
+        if build.target.is_some() {
+            self.take(foundation.id(), self.releaser(player, idx)?)?;
         }
+        self.install_build(player, idx, build)?;
         Ok(Answer::Taken)
     }
 }

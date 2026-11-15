@@ -156,14 +156,13 @@ impl World {
     }
 
     /// The work command's Build (its task of action type 101, the factory `FUN_140aca4b0` case
-    /// 0x65): the action takes its foundation (slot 0x178); the unit AI's notify
-    /// (`FUN_14106e4e0` kind 0x65: the build order and action, the foundation with its class, the
-    /// work's point); the install (slot 0x808, [`World::set_only_action`]) clears the action
-    /// list and holds the Build ([`crate::construction::build::BuildAction::start`] with the
-    /// footprints' gap, the task's range and work value, the master's work rate with the unit's
-    /// powerup), as BUILD's builders take it. A builder in state 3 or later holds none: the list
-    /// deletes the Build, which lets its foundation go (a unit in state 3 adds no sub-action, so
-    /// the started Build holds no `MoveTo` and tears down as the unstarted one).
+    /// 0x65): the constructor ([`BuildAction::new`] with the task's range and work value, the
+    /// master's work rate with the unit's powerup) holds a foundation of the builder's own player
+    /// up to state 6, which it takes (slot 0x178); the unit AI's notify (`FUN_14106e4e0` kind
+    /// 0x65: the build order and action, the foundation with its class, the work's point); the
+    /// install (slot 0x808, [`World::install_build`]) clears the action list, holds the Build and
+    /// starts it: it walks to the foundation it holds, else waits for work. A builder in state 3
+    /// or later holds none: the list deletes the Build unstarted, which lets its foundation go.
     pub(super) fn start_build(
         &mut self,
         player: PlayerId,
@@ -174,32 +173,17 @@ impl World {
         notifies: Notifies,
     ) -> GenieResult<()> {
         let (tp, target_unit) = self.object(target).ok_or(FOUNDATION_NOT_HELD)?;
-        let tm = target_unit.master(self.master_tables(), tp)?;
-        let (target_at, target_radius, class) = (target_unit.position(), tm.radius, tm.class);
-        let target_state = Some(target_unit.life.state);
+        let class = target_unit.master(self.master_tables(), tp)?.class;
         let unit = &self.players.live(player, idx)?;
         let builder = unit.master(self.master_tables(), player)?;
-        let to = WalkTo {
-            id: Some(target),
-            at: target_at,
-            gap: footprint_gap(unit.position(), builder.radius, target_at, target_radius),
-            state: target_state,
-        };
         let build_task = BuildTask::of(
             task,
             builder.action_part().work_rate + self.parts.combat_of(unit.id).work_rate_powerup,
         );
-        // the sprites its MoveTo's constructor takes for none (FUN_140aa0df0)
-        let move_reads = MoveToReads::of(
-            unit,
-            self.top_speed(player, unit)?,
-            builder,
-            &self.model.graphics,
-            self.parts.combat_of(unit.id).abilities.look.as_ref(),
-            &self.model.roles,
-        );
-        let build = BuildAction::start(to, build_task, &move_reads, &self.model.tuning.move_to)?;
-        self.take(target, self.releaser(player, idx)?)?;
+        let build = BuildAction::new(build_task, player, tp, target_unit);
+        if build.target.is_some() {
+            self.take(target, self.releaser(player, idx)?)?;
+        }
         let unit = self.players.live_mut(player, idx)?;
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             ai.notify_work(
@@ -212,21 +196,13 @@ impl World {
             )?;
             self.remember_order(player, idx, (Some(OrderKind::Build), Some(AiAction::Build)))?;
         }
-        if let Some(build) = self.set_only_action(player, idx, Some(build))? {
-            self.parts
-                .actions_mut(self.players.live(player, idx)?.id)?
-                .list
-                .set_build(Some(build));
-        }
-        Ok(())
+        self.install_build(player, idx, build)
     }
 
-    /// The Repair's constructor (`FUN_140ad7fa0`) on `target`, which the task finder found the
-    /// task `task` on: the action takes its target (slot 0x178) at its place (a ship's meeting
-    /// point, `FUN_140ad9120`, is not modelled: [`crate::construction::repair::SHIP_REPAIR`]); its start
-    /// (slot 5, `FUN_140ad9030` with its force flag) walks to the target (state 4) within the
-    /// unit's master's weapon range ([`crate::construction::repair::RepairAction::start`]). With the target's
-    /// class.
+    /// The Repair's constructor on `target`, which the task finder found the task `task` on
+    /// ([`RepairAction::new`]: its target with its place, within the unit's master's weapon range;
+    /// a target past state 6 faults), a ship's meeting point (`FUN_140ad9120`) not modelled
+    /// ([`SHIP_REPAIR`]); the action takes its target (slot 0x178). With the target's class.
     pub(super) fn new_repair(
         &mut self,
         player: PlayerId,
@@ -236,6 +212,12 @@ impl World {
     ) -> GenieResult<(RepairAction, ClassId)> {
         let (tp, target_unit) = self.object(target).ok_or(REPAIR_TARGET_GONE)?;
         let tm = target_unit.master(self.master_tables(), tp)?;
+        let unit = &self.players.live(player, idx)?;
+        let range = unit
+            .master(self.master_tables(), player)?
+            .combat_part()
+            .weapon_range;
+        let repair = RepairAction::new(RepairTask::of(task), range, target_unit)?;
         if self
             .model
             .roles
@@ -245,25 +227,6 @@ impl World {
             return Err(SHIP_REPAIR);
         }
         let class = tm.class;
-        let unit = &self.players.live(player, idx)?;
-        let master = unit.master(self.master_tables(), player)?;
-        let move_reads = MoveToReads::of(
-            unit,
-            self.top_speed(player, unit)?,
-            master,
-            &self.model.graphics,
-            self.parts.combat_of(unit.id).abilities.look.as_ref(),
-            &self.model.roles,
-        );
-        let to = move_reads.walk_to_found(self, (tp, target_unit))?;
-        let repair_task = RepairTask::of(task);
-        let repair = RepairAction::start(
-            to,
-            repair_task,
-            master.combat_part().weapon_range,
-            &move_reads,
-            &self.model.tuning.move_to,
-        )?;
         self.take(target, self.releaser(player, idx)?)?;
         Ok((repair, class))
     }
@@ -271,8 +234,9 @@ impl World {
     /// The work command's Repair (its task of action type 106, the factory `FUN_140aca4b0` case
     /// 0x6a, [`World::new_repair`]); the unit AI's notify (`FUN_14106e4e0` kind 0x6a: the repair
     /// order 0x2ce and action 0x26a, the target with its class, the work's point); the install
-    /// (slot 0x808, [`World::set_only_action`]) clears the action list and holds the Repair, or
-    /// deletes it for a repairer in state 3 or later, its target let go.
+    /// (slot 0x808, [`World::install_repair`]) clears the action list, holds the Repair and
+    /// starts it, a walk to its target, or deletes it unstarted for a repairer in state 3 or
+    /// later, its target let go.
     pub(super) fn start_repair(
         &mut self,
         player: PlayerId,
@@ -300,20 +264,14 @@ impl World {
                 (Some(OrderKind::Repair), Some(AiAction::Repair)),
             )?;
         }
-        if let Some(repair) = self.set_only_action(player, idx, Some(repair))? {
-            self.parts
-                .actions_mut(self.players.live(player, idx)?.id)?
-                .list
-                .set_repair(Some(repair));
-        }
-        Ok(())
+        self.install_repair(player, idx, repair)
     }
 
     /// The unit's repair command its unit AI gave ([`crate::unit_ai::world_view::RepairOrder`]), after the
     /// update: the Repair on top takes the target ([`World::repair_retarget`]); else the master
     /// switches (slot 0x90 with 0, [`World::change_master`]), then a Repair on the task found
-    /// ([`World::new_repair`]) replaces the unit's actions (slot 0x808,
-    /// [`World::set_only_action`]).
+    /// ([`World::new_repair`]) replaces the unit's actions and starts (slot 0x808,
+    /// [`World::install_repair`]).
     ///
     /// # Errors
     ///
@@ -339,12 +297,7 @@ impl World {
                 }
                 if let Some(task) = task {
                     let (repair, _) = self.new_repair(player, idx, target, &task)?;
-                    if let Some(repair) = self.set_only_action(player, idx, Some(repair))? {
-                        self.parts
-                            .actions_mut(self.players.live(player, idx)?.id)?
-                            .list
-                            .set_repair(Some(repair));
-                    }
+                    self.install_repair(player, idx, repair)?;
                 }
             }
         }

@@ -60,7 +60,7 @@ building's own steps first, then the builder's or repairer's action.
 | [`speedup_tests.rs`](speedup_tests.rs) | Tests: A speed-up building's work on the objects about it (`FUN_1411c39b0`, `FUN_1411c4a00`): the tiles of its reach, its three effects on the allied objects its player's object target names, and the call in its whole seconds. |
 | [`wait_solidify.rs`](wait_solidify.rs) | A villager's wait for a foundation: `TRIBE_Action_Wait_Solidify` (action type 0x9a, vtable `0x142ed82f8`). |
 | [`wait_solidify_state.rs`](wait_solidify_state.rs) | A Wait Solidify's state: waiting for its foundation to turn solid. |
-| [`build/`](build/) | A builder's Build action (`TRIBE_Action_Build`, type 101, vtable `0x142ed6628`) up to the builder's walk: the action starts in state 4 with a `MoveTo` sub-action (`RGE_Action_Move_To`, type 1) toward the foundation; a builder already at the foundation works in its first update (state 6). |
+| [`build/`](build/) | A builder's Build action (`TRIBE_Action_Build`, type 101, vtable `0x142ed6628`) up to the builder's walk: the install's start takes state 4 with a `MoveTo` sub-action (`RGE_Action_Move_To`, type 1) toward the foundation, or waits for work (state 3) where the constructor took none; a builder already at the foundation works in its first update (state 6). |
 | [`building_update/`](building_update/) | The building update's tests. |
 | [`gates/`](gates/) | The gates' tests. |
 | [`housing/`](housing/) | A building's Housing: `TRIBE_Action_Housing` (action type 0x7b, vtable `0x142ed7008`), which `UNIT_ORDER`'s case 3 installs on a building (`World::housing_order`). |

@@ -37,6 +37,7 @@ use genie_diff::Diff;
 mod action;
 pub(crate) mod payment;
 mod repair_state;
+mod start;
 pub(crate) mod unit;
 
 pub use self::action::{RepairerCount, work_amount};
@@ -75,6 +76,15 @@ pub const fn repairers(masters: MasterSlots) -> [(TaskGroup, MasterId); 2] {
 /// The repair of a ship (its meeting point, `FUN_140ad9120`), which is not modelled.
 pub const SHIP_REPAIR: GenieError =
     GenieError::unsupported("the task finder's repair (106) of a ship (FUN_140ad9120)");
+
+/// The Repair's constructor (`FUN_140ad7fa0`) on a target past [`LAST_TAKEN`]: its
+/// `FUN_140a7a230` holds none (`+0x20` null), and its `FUN_140ad9120` then reads that null
+/// target's master with no null test (`0x140ad913c`: `MOV RAX, [RCX+0x20]`; `0x140ad9161`:
+/// `MOV RDX, [RAX+0xa0]`): the game faults there, before the take and the unit AI's notify.
+///
+/// [`LAST_TAKEN`]: crate::objects::actions::LAST_TAKEN
+pub(crate) const REPAIR_TARGET_UNHELD: GenieError =
+    GenieError::unreachable("a Repair's constructor reads the master of a target it does not hold");
 
 /// What a Repair works with: its task's id, key, work value (`+0x28`, `work_val1`) and
 /// sprites.
@@ -192,4 +202,4 @@ impl RepairReads {
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

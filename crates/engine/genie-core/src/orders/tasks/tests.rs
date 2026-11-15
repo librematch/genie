@@ -5,6 +5,7 @@ use super::*;
 use crate::construction::BuilderCount;
 use crate::construction::build::BuildState;
 use crate::construction::repair::REPAIR;
+use crate::construction::repair::REPAIR_TARGET_UNHELD;
 use crate::gathering::DropSiteId;
 use crate::gathering::GatherTargetId;
 use crate::gathering::HuntTargetId;
@@ -116,6 +117,99 @@ fn build_start_of_dying_builder_deletes_new_build_and_lets_foundation_go() {
     assert_eq!(workers(&world, HOUSE), WorkerCount::ZERO);
 }
 
+/// The notifies the villager's unit AI heard.
+fn heard(world: &World) -> Vec<(NotifyKind, [i32; 3])> {
+    world
+        .parts
+        .unit_ai
+        .get(VILLAGER)
+        .unwrap()
+        .notifies
+        .iter()
+        .map(|notify| (notify.kind, notify.params))
+        .collect()
+}
+
+/// The work command's Build on a foundation of another player (the house given to Gaia): the
+/// constructor (`FUN_140aad4e0`) compares the builder's player's id with the foundation's
+/// (`+0x718`), so it holds no target and leaves its point at (0, 0, 0) (`FUN_140a73e90`): nothing
+/// is taken. The install's start (slot 0x28 with 1, `0x140aadd80` without a target) waits for
+/// work (`set_state(3)`): the unit AI, with no order queued, hears notify 0x202 with the build's
+/// action value.
+#[test]
+fn build_start_on_foundation_of_another_player_waits_for_work() {
+    let mut world = sent_off_world(vec![]);
+    world.object_mut(VILLAGER).unwrap().1.life.master_id = ids::BUILDER;
+    let house = world.players[1]
+        .objects
+        .swap_remove(ListIndex::new(1))
+        .unwrap();
+    world.players[0].objects.push(house);
+    world.reindex();
+    let task = task_of(&world, ids::BUILDER, ActionKind::BUILD);
+    world
+        .start_build(PLAYER, SLOT, HOUSE, &task, Position::ORIGIN, Notifies::Kept)
+        .unwrap();
+    let build = world
+        .parts
+        .actions_of(VILLAGER)
+        .list
+        .build()
+        .copied()
+        .unwrap();
+    assert_eq!(
+        (build.target, build.state, build.point),
+        (None, BuildState::Idle, Position::ORIGIN)
+    );
+    assert_eq!(workers(&world, HOUSE), WorkerCount::ZERO);
+    assert_eq!(
+        heard(&world),
+        [(NotifyKind::REQUIRES_SEARCH, [AiAction::Build.value(), 0, 0])]
+    );
+}
+
+/// The work command's Build on its player's foundation past state 6: the constructor's
+/// `FUN_140a7a230` holds none and takes nothing, but the point takes the foundation's place; the
+/// install's start then waits for work (`set_state(3)`, notify 0x202). One in state 6 is held
+/// and taken, and the start walks to it (`set_state(4)`).
+#[test]
+fn build_start_on_foundation_past_state_6_waits_for_work() {
+    for state in [ObjectState::Undead, ObjectState::Removed, ObjectState::Gone] {
+        let mut world = sent_off_world(vec![]);
+        world.object_mut(VILLAGER).unwrap().1.life.master_id = ids::BUILDER;
+        world.object_mut(HOUSE).unwrap().1.life.state = state;
+        let task = task_of(&world, ids::BUILDER, ActionKind::BUILD);
+        world
+            .start_build(PLAYER, SLOT, HOUSE, &task, Position::ORIGIN, Notifies::Kept)
+            .unwrap();
+        let build = world
+            .parts
+            .actions_of(VILLAGER)
+            .list
+            .build()
+            .copied()
+            .unwrap();
+        let waits = [(NotifyKind::REQUIRES_SEARCH, [AiAction::Build.value(), 0, 0])];
+        let (target, built, taken, told) = if state == ObjectState::Undead {
+            (
+                Some(FoundationId::new(HOUSE)),
+                BuildState::Move { move_to: None },
+                WorkerCount::ONE,
+                &[][..],
+            )
+        } else {
+            (None, BuildState::Idle, WorkerCount::ZERO, &waits[..])
+        };
+        assert_eq!(
+            (build.target, build.state.bare(), build.point),
+            (target, built, Position::new(30.0, 88.0, 0.0)),
+            "{state:?}"
+        );
+        assert_eq!(workers(&world, HOUSE), taken, "{state:?}");
+        assert_eq!(heard(&world), told, "{state:?}");
+    }
+}
+
 /// The work command's Repair (`FUN_140aca4b0` case 0x6a) of a villager without a unit AI: no
 /// notify, but the Repair takes its target and replaces the villager's actions, walking to it.
 #[test]
@@ -150,6 +244,37 @@ fn repair_start_of_dying_repairer_deletes_new_repair_and_lets_target_go() {
         .unwrap();
     assert_eq!(repair_of(&world), None);
     assert_eq!(workers(&world, HOUSE), WorkerCount::ZERO);
+}
+
+/// The work command's Repair on a target past state 6: the constructor's `FUN_140a7a230` holds
+/// none, and its `FUN_140ad9120` reads the null target's master (`0x140ad9161`): the game faults
+/// before the take and the unit AI's notify ([`REPAIR_TARGET_UNHELD`]). One in state 6 is held,
+/// taken and walked to.
+#[test]
+fn repair_start_on_target_past_state_6_faults_before_take() {
+    for state in [ObjectState::Undead, ObjectState::Removed, ObjectState::Gone] {
+        let mut world = repair_world();
+        world.object_mut(HOUSE).unwrap().1.life.state = state;
+        let task = task_of(&world, ids::BUILDER, REPAIR);
+        let started =
+            world.start_repair(PLAYER, SLOT, HOUSE, &task, Position::ORIGIN, Notifies::Kept);
+        if state == ObjectState::Undead {
+            assert_eq!(started, Ok(()));
+            assert_eq!(
+                repair_of(&world).map(|repair| (repair.target, repair.state.bare())),
+                Some((
+                    Some(RepairTargetId::new(HOUSE)),
+                    RepairState::Move { move_to: None }
+                ))
+            );
+            assert_eq!(workers(&world, HOUSE), WorkerCount::ONE);
+        } else {
+            assert_eq!(started, Err(REPAIR_TARGET_UNHELD), "{state:?}");
+            assert_eq!(repair_of(&world), None, "{state:?}");
+            assert_eq!(workers(&world, HOUSE), WorkerCount::ZERO, "{state:?}");
+            assert_eq!(told(&world), (None, None, None), "{state:?}");
+        }
+    }
 }
 
 /// [`repair_world`] with the villager's Repair on the house walking to it (state 4), counted
@@ -376,17 +501,20 @@ fn build_retake_tells_unit_ai_build_order_on_foundation() {
 }
 
 /// The Repair's constructor (`FUN_140ad7fa0`) takes its target (slot 0x178) and answers the
-/// Repair with the target's class; it installs nothing: the villager's actions stay.
+/// Repair with the target's class, its place the point; it installs and starts nothing: the
+/// villager's actions stay, and the Repair waits for the install's start (state 3, where the
+/// game's constructor leaves 0).
 #[test]
 fn new_repair_takes_target_and_installs_nothing() {
     let mut world = repair_world();
     let task = task_of(&world, ids::BUILDER, REPAIR);
     let (repair, class) = world.new_repair(PLAYER, SLOT, HOUSE, &task).unwrap();
     assert_eq!(
-        (repair.target, repair.state.bare(), class),
+        (repair.target, repair.state, repair.point, class),
         (
             Some(RepairTargetId::new(HOUSE)),
-            RepairState::Move { move_to: None },
+            RepairState::Idle,
+            Position::new(30.0, 88.0, 0.0),
             class::BUILDING
         )
     );

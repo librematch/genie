@@ -121,14 +121,32 @@ const TARGET: WalkTo = WalkTo {
 
 /// The Repair of the work command on [`TARGET`], within 0, with [`TASK`].
 fn started() -> RepairAction {
-    RepairAction::start(
-        TARGET,
-        TASK,
-        Distance::ZERO,
-        &move_reads(&graphics()),
-        &tuning().move_to,
-    )
-    .unwrap()
+    walking_to(TARGET, TASK, Distance::ZERO, &move_reads(&graphics()))
+}
+
+/// A Repair on `to` within `range` with `task` as the install's start leaves it (slot 0x28 with
+/// 1, `set_state(4)`): loud, not counted, the target's place its point, its `MoveTo` to the
+/// target ([`RepairAction::walk`] with `reads`).
+pub(crate) fn walking_to(
+    to: WalkTo,
+    task: RepairTask,
+    range: Distance,
+    reads: &MoveToReads<'_>,
+) -> RepairAction {
+    let mut repair = RepairAction {
+        target: to.id.map(RepairTargetId::new),
+        state: RepairState::Idle,
+        point: to.at,
+        timer: Seconds::ZERO,
+        task,
+        range,
+        counted: false,
+        voice: Voice::Loud,
+    };
+    repair.state = RepairState::Move {
+        move_to: repair.walk(reads, Some(to), &tuning().move_to).unwrap(),
+    };
+    repair
 }
 
 /// A villager's master work rate 1 with a powerup of 0: half a hit point per second per the
@@ -584,14 +602,7 @@ fn repair_move_to_shows_its_task_moving_sprite_else_its_default() {
 #[test]
 fn repair_move_tos_are_quiet() {
     let graphics = graphics();
-    let repair_action = RepairAction::start(
-        TARGET,
-        TASK,
-        Distance::new(1.5),
-        &move_reads(&graphics),
-        &tuning().move_to,
-    )
-    .unwrap();
+    let repair_action = walking_to(TARGET, TASK, Distance::new(1.5), &move_reads(&graphics));
     let to_target = MoveToAction {
         state: MoveTo::Start,
         point: Position::new(11.0, 10.0, 0.0),
@@ -624,8 +635,7 @@ fn repair_move_tos_are_quiet() {
 fn repair_move_to_starts_as_its_list_adds_it() {
     let graphics = graphics();
     let state = |to, reads: MoveToReads<'_>| {
-        RepairAction::start(to, TASK, Distance::ZERO, &reads, &tuning().move_to)
-            .unwrap()
+        walking_to(to, TASK, Distance::ZERO, &reads)
             .state
             .move_to()
             .copied()

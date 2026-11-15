@@ -1,5 +1,5 @@
-//! The Repair action's start, update and states ([`RepairAction`]): the walk, the face, the
-//! wait, the work, a new target, a move and the halt.
+//! The Repair action's update and states ([`RepairAction`]): the walk, the face, the wait, the
+//! work, a new target, a move and the halt.
 
 use crate::combat::attack::Aim;
 use crate::combat::attack::face_target;
@@ -8,7 +8,7 @@ use crate::construction::repair::RepairOutcome;
 use crate::construction::repair::RepairState;
 use crate::construction::repair::action::enter::wait_for_work;
 use crate::construction::repair::repair_target;
-use crate::construction::repair::{ONE, RepairAction, RepairReads, RepairTask, Repairee};
+use crate::construction::repair::{ONE, RepairAction, RepairReads, Repairee};
 use crate::construction::{BuilderCount, RepairTargetId};
 use crate::map::Distance;
 use crate::map::Position;
@@ -22,7 +22,6 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
-use crate::objects::Voice;
 use crate::objects::WorkRate;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMastersExt;
@@ -121,38 +120,6 @@ pub enum RepairerCount {
 }
 
 impl RepairAction {
-    /// A Repair from the work command (the factory `FUN_140aca4b0` case 0x6a, `FUN_140ad7fa0`):
-    /// its target `to`, whose place is its point, the task, not counted, not quiet; the start
-    /// (slot 5, `FUN_140ad9030` with its force flag) then turns to state 4, whose `set_state`
-    /// makes the `MoveTo` to the target within `range` ([`RepairAction::walk`] with what it
-    /// reads of the repairer, `move_reads`).
-    ///
-    /// # Errors
-    ///
-    /// A sprite the table lacks.
-    pub fn start(
-        to: WalkTo,
-        task: RepairTask,
-        range: Distance,
-        move_reads: &MoveToReads<'_>,
-        move_to_tuning: &MoveToTuning,
-    ) -> GenieResult<Self> {
-        let mut repair = Self {
-            target: to.id.map(RepairTargetId::new),
-            state: RepairState::Move { move_to: None },
-            point: to.at,
-            timer: Seconds::ZERO,
-            task,
-            range,
-            counted: false,
-            voice: Voice::Loud,
-        };
-        repair.state = RepairState::Move {
-            move_to: repair.walk(move_reads, Some(to), move_to_tuning)?,
-        };
-        Ok(repair)
-    }
-
     /// The `MoveTo` of state 4 (`0x140ad9c60` case 4: `FUN_140aa0df0` with the action's range and
     /// the task's moving sprite `+0x40`, then quiet) to the target `to`, or without one
     /// ([`MoveToReads::to_nothing`]), as the sub-action list adds it.
