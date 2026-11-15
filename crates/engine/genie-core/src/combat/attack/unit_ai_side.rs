@@ -27,7 +27,7 @@ use crate::objects::masters::player_masters;
 use crate::objects::release::Releaser;
 use crate::objects::sprite::new_sprite;
 use crate::objects::teardown::HeadStart;
-use crate::orders::{PACK_OR_UNPACK, placed_reach};
+use crate::orders::{UNPACK_INSTALL, placed_reach};
 use crate::unit_ai::Attacked;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::UnitAi;
@@ -277,8 +277,8 @@ impl UnitView<'_, '_> {
     /// (`FUN_1415417a0`) answers false; class 54 works the target at its place (slot 0x7e8 with
     /// the retargeting byte 0 and any task, [`AiCommand::WorkOn`] at once) and
     /// answers true; class 51 unpacks within its reach (`FUN_1410862c0`, [`placed_reach`]:
-    /// `FUN_140ae58a0` through slot 0x808, [`PACK_OR_UNPACK`]) and hands over out of it. A unit
-    /// the load could not read whole may be under its Pack or Unpack ([`PACK_OR_UNPACK`] too).
+    /// `FUN_140ae58a0` through slot 0x808, [`UNPACK_INSTALL`]) and hands over out of it. A unit
+    /// the load could not read whole may be under its Pack or Unpack ([`UNPACK_INSTALL`] too).
     fn trebuchet_attack(
         &mut self,
         target: ObjectId,
@@ -292,7 +292,7 @@ impl UnitView<'_, '_> {
             return Ok(None);
         }
         if self.step.world.parts.unread.contains(self.unit.id) {
-            return Err(PACK_OR_UNPACK);
+            return Err(UNPACK_INSTALL);
         }
         match self.actions.top_action_kind() {
             Some(ActionKind::PACK | ActionKind::UNPACK) => return Ok(Some(Attacked::default())),
@@ -320,7 +320,7 @@ impl UnitView<'_, '_> {
             .get(self.unit.id)
             .ok_or(ATTACKER_UNPLACED)?;
         if placed_reach(me_at, &placed, master).0 {
-            return Err(PACK_OR_UNPACK);
+            return Err(UNPACK_INSTALL);
         }
         Ok(None)
     }

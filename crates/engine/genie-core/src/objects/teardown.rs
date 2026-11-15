@@ -403,11 +403,11 @@ impl Unit {
     /// action layer `actions`, its step): the Artifact's (`0x140aac960`) acts only with 1, the
     /// wait for a foundation's (`0x140ae87c0`) is empty, and the Make's (`0x140a99980`) starts it
     /// again ([`MakeAction::first`] with its owner's attributes); the Housing's (`0x140ac2240`)
-    /// acts only with 1 ([`HousingAction::start`]), as the Pack's (`0x140ad6150`) and the
-    /// Unpack's (`FUN_140ae68f0`) do. The Explore's (`0x140a87e10`) starts it again too
-    /// ([`Unit::restart_explore`]: to its point, or waiting for one); the Transport's
-    /// (`FUN_140aa3e10`) idles ([`Unit::restart_transport`]) and the missile's (`0x140a9c5b0`)
-    /// flies ([`MissileAction::restart`]). A `MoveTo` of its own (`0x140aa2100`)
+    /// acts only with 1 ([`HousingAction::start`]), as the Pack's (`0x140ad6150`,
+    /// [`Unit::start_pack`]) and the Unpack's (`FUN_140ae68f0`) do. The Explore's (`0x140a87e10`)
+    /// starts it again too ([`Unit::restart_explore`]: to its point, or waiting for one); the
+    /// Transport's (`FUN_140aa3e10`) idles ([`Unit::restart_transport`]) and the missile's
+    /// (`0x140a9c5b0`) flies ([`MissileAction::restart`]). A `MoveTo` of its own (`0x140aa2100`)
     /// walks and updates at once ([`Unit::restart_move_to`]); an Enter (`0x140a86f20`) starts again
     /// on its target ([`Unit::restart_enter`]). A Hunt (`0x140ac49b0`) takes the task's load from
     /// a target that holds something and searches ([`Unit::hunt_begin_search`]); a Gather
@@ -439,9 +439,9 @@ impl Unit {
                 Action::Artifact(_)
                 | Action::WaitSolidify(_)
                 | Action::Housing(_)
-                | Action::Pack(_)
                 | Action::Unpack(_),
             ) => Ok(()),
+            Some(Action::Pack(_)) => self.start_pack(HeadStart::Restarted, actions, step),
             Some(Action::Make(make)) => {
                 make.first(
                     &step.world.players.player(step.player)?.attributes,

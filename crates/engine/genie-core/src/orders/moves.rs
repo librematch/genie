@@ -1,5 +1,6 @@
 //! A unit's move, to a point or aside, a work order, its reach and a point's move order.
 
+use crate::commands::QueueId;
 use crate::gathering::PastureId;
 use crate::map::Distance;
 use crate::map::Point;
@@ -24,7 +25,9 @@ use crate::objects::sprite::Graphic;
 use crate::orders::Dispatch;
 use crate::orders::OrderFlags;
 use crate::orders::ReadyOrders;
-use crate::orders::{MoveOrder, Work, ignore_unit, packs, readiness, work_reach};
+use crate::orders::{
+    MoveOrder, SiegeInstall, Work, ignore_unit, readiness, siege_install, work_reach,
+};
 use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -45,10 +48,11 @@ use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
-/// The Pack (`TRIBE_Action_Pack`, `FUN_140ad4ff0`) or Unpack (`TRIBE_Action_Unpack`,
-/// `FUN_140ae58a0`) a trebuchet's work order or attack command makes, neither held.
-pub(crate) const PACK_OR_UNPACK: GenieError =
-    GenieError::unsupported("a Pack or Unpack of class 54 or 51 (FUN_140ad4ff0, FUN_140ae58a0)");
+/// The Unpack (`TRIBE_Action_Unpack`, `FUN_140ae58a0`) that a packed trebuchet's (class 51) work
+/// order or attack command installs, not made (the task unpack-install-sites). A trebuchet the
+/// load could not read whole may be under its Unpack, which their first tests read.
+pub(crate) const UNPACK_INSTALL: GenieError =
+    GenieError::unsupported("an Unpack of class 51 through slot 0x808 (FUN_140ae58a0)");
 /// An order's target without a place on the map.
 const ORDER_TARGET_UNPLACED: GenieError = GenieError::unsupported("a target without a place");
 /// A unit a move order moves without movement state.
@@ -322,11 +326,12 @@ impl World {
     /// (`FUN_141227190`): a unit of class 54 under its own Pack or Unpack (`0x7c`, `0x7d`), then a
     /// unit in state 3 or later, ignores it. Against a target the
     /// unit is not allied with (`FUN_141663d90` with allies) [`work_reach`] (`FUN_1410862c0`)
-    /// decides: class 54 out of reach packs (`FUN_140ad4ff0`), class 51 in reach unpacks
-    /// (`FUN_140ae58a0`), each through slot 0x808; else a target below the least range is the
-    /// unit's notify [`NotifyKind::TOO_CLOSE`] to its own unit AI (slot 0x328) and nothing more.
-    /// Without a target the world holds (none, or one gone) the work command goes to the point, and
-    /// a computer's class 54 packs instead. Neither install is modelled ([`PACK_OR_UNPACK`]). A
+    /// decides ([`siege_install`]): class 54 out of reach packs ([`World::install_pack`], its
+    /// Pack taking the target after slot 0x808), class 51 in reach unpacks (`FUN_140ae58a0`
+    /// through slot 0x808, not made: [`UNPACK_INSTALL`]); else a target below the least range is
+    /// the unit's notify [`NotifyKind::TOO_CLOSE`] to its own unit AI (slot 0x328) and nothing
+    /// more. Without a target the world holds (none, or one gone) the work command goes to the
+    /// point, and a computer's (`FUN_141659cf0`) class 54 packs instead, with no target. A
     /// villager drops its town-bell
     /// flag (`FUN_1412067f0`); then the work command. A villager on a pasture (1893, 1897) whose
     /// livestock's workers (slot 0x780,
@@ -368,23 +373,29 @@ impl World {
         }
         let target = self.object(order.target).map(|(tp, _)| tp);
         let reach = self.order_reach(player, unit.id, order, target, master)?;
-        let packs = packs(
+        // a class 54 under an action the slice does not hold may be under its Unpack
+        if self
+            .model
+            .roles
+            .of_class(class)
+            .contains(ClassRoles::UNPACKED_TREBUCHET)
+            && self.parts.unread.contains(unit.id)
+        {
+            return Err(UNPACK_INSTALL);
+        }
+        match siege_install(
             class,
             reach,
-            target.is_none(),
+            target,
             self.players.player(player)?.kind,
             &self.model.roles,
-        );
-        // a class 54 under an action the slice does not hold may be under its Unpack
-        if packs
-            || (self
-                .model
-                .roles
-                .of_class(class)
-                .contains(ClassRoles::UNPACKED_TREBUCHET)
-                && self.parts.unread.contains(unit.id))
-        {
-            return Err(PACK_OR_UNPACK);
+        ) {
+            // the Pack takes the order's target the world holds (slot 0x68), none without one
+            Some(SiegeInstall::Pack) => {
+                return self.install_pack(player, idx, QueueId::NONE, target.and(order.target));
+            }
+            Some(SiegeInstall::Unpack) => return Err(UNPACK_INSTALL),
+            None => {}
         }
         if reach.is_some_and(|(_, too_close)| too_close) {
             let unit = self.players.live_mut(player, idx)?;

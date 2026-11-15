@@ -382,13 +382,14 @@ impl Unit {
     }
 
     /// Slot 0x68 with the unit's master's construction sprite (`+0x950`), its standing one
-    /// (`+0x470`) for none (`FUN_141158620`): [`Unit::show_graphic`].
+    /// (`+0x470`) for none (`FUN_141158620`): [`Unit::show_graphic`]. The Unpack's
+    /// `set_state(6)` and the Pack's ([`Unit::set_pack_state`]) show it.
     ///
     /// # Errors
     ///
     /// A unit of a master the world lacks or without its building part, and a sprite the slice
     /// holds without the one shown.
-    fn show_construction(&mut self, step: &mut Step<'_>) -> GenieResult<()> {
+    pub(crate) fn show_construction(&mut self, step: &mut Step<'_>) -> GenieResult<()> {
         let master = self.master(step.world.master_tables(), step.player)?;
         let building = master.building.as_ref().ok_or(PACK_NOT_BUILDING)?;
         let shown = building

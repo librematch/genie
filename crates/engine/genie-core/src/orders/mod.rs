@@ -57,7 +57,7 @@ mod interact;
 mod master_change;
 pub(crate) use self::master_change::{ActionsOnChange, hit_point_share};
 mod moves;
-pub(crate) use self::moves::{PACK_OR_UNPACK, placed_reach};
+pub(crate) use self::moves::{UNPACK_INSTALL, placed_reach};
 mod order_flags;
 pub use self::order_flags::OrderFlags;
 mod patrol;
@@ -165,34 +165,37 @@ impl ControlKey {
     }
 }
 
-/// [`World::order_work`]'s Pack or Unpack (each through slot 0x808): against a target out of
-/// the unit's `reach` ([`work_reach`]) class 54 packs (`FUN_140ad4ff0`), within it class 51
-/// unpacks (`FUN_140ae58a0`); without a reach, a computer's class 54 packs when the order has
-/// no target the world holds (`targetless`).
-fn packs(
+/// What a trebuchet's work order installs through slot 0x808 in place of the work command
+/// ([`World::order_work`], [`siege_install`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum SiegeInstall {
+    /// An unpacked trebuchet's (class 54) Pack (`FUN_140ad4ff0`, [`World::install_pack`]).
+    Pack,
+    /// A packed trebuchet's (class 51) Unpack (`FUN_140ae58a0`), not made ([`UNPACK_INSTALL`]).
+    Unpack,
+}
+
+/// [`World::order_work`]'s Pack or Unpack of a unit of class `class`: against a target out of
+/// the unit's `reach` ([`work_reach`]) class 54 packs (`CMP AX, 0x36` at `0x1412272fa`, then
+/// `TEST EDX, EDX`), within it class 51 unpacks (`CMP AX, 0x33` at `0x1412273be`); without a
+/// reach, a computer's (`player_kind`) class 54 packs when the order has no target the world
+/// holds (`target`, the player holding it: `TEST RSI, RSI`, then `CMP AX, 0x36` at
+/// `0x141227566`); else none.
+fn siege_install(
     class: ClassId,
     reach: Option<(bool, bool)>,
-    targetless: bool,
+    target: Option<PlayerId>,
     player_kind: PlayerKind,
     roles: &Roles,
-) -> bool {
+) -> Option<SiegeInstall> {
+    let class_roles = roles.of_class(class);
+    let unpacked = class_roles.contains(ClassRoles::UNPACKED_TREBUCHET);
     match reach {
-        // Masters and classes the order handler and slot 0x7e8 treat apart (decoded; the game stores a
-        // class as its value − 0xeac, a master id as its id + 0x609c).
-        None => {
-            targetless
-                && roles
-                    .of_class(class)
-                    .contains(ClassRoles::UNPACKED_TREBUCHET)
-                && player_kind.is_computer()
-        }
-        Some((within, _)) => {
-            (roles
-                .of_class(class)
-                .contains(ClassRoles::UNPACKED_TREBUCHET)
-                && !within)
-                || (roles.of_class(class).contains(ClassRoles::PACKED_TREBUCHET) && within)
-        }
+        None => (target.is_none() && player_kind.is_computer() && unpacked)
+            .then_some(SiegeInstall::Pack),
+        Some((within, _)) if unpacked && !within => Some(SiegeInstall::Pack),
+        Some((within, _)) => (within && class_roles.contains(ClassRoles::PACKED_TREBUCHET))
+            .then_some(SiegeInstall::Unpack),
     }
 }
 /// A hunt sends at most this many animals of a herd to its drop site (`FUN_140ac4c60`'s list,

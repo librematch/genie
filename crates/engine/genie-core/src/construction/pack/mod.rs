@@ -7,17 +7,20 @@
 //!
 //! Its slots: the load `FUN_140ad5090` ([`crate::world::load::top_actions`]), the destructor
 //! (slot 0, `0x140ad6070` over `FUN_140ad5370`, [`crate::world::World::pack_torn_down`]), the
-//! start (slot 0x28, `0x140ad6150`), the update (slot 0x30, `0x140ad69d0`,
-//! [`crate::objects::unit::Unit::pack_part`]), the stop (slot 0x38, `0x140ad69b0`,
-//! [`PackAction::halt`]) and `set_state` (slot 0x80, `0x140ad68e0`). The save (slot 0x20,
-//! `0x140ad6230`) writes the base, `+0x6c`, `+0x68` and `+0x44`. Its other slots are
-//! `RGE_Action`'s: its slot 0x68 is the base's change of target (`FUN_140a7a230`), and it makes no
-//! sub-action. The object stop reads its progress (`FUN_140ad6170`, [`PackAction::progress`]).
+//! start (slot 0x28, `0x140ad6150`, [`crate::objects::unit::Unit::start_pack`]), the update (slot
+//! 0x30, `0x140ad69d0`, [`crate::objects::unit::Unit::pack_part`]), the stop (slot 0x38,
+//! `0x140ad69b0`, [`PackAction::halt`]) and `set_state` (slot 0x80, `0x140ad68e0`,
+//! [`crate::objects::unit::Unit::set_pack_state`]). The save (slot 0x20, `0x140ad6230`) writes the
+//! base, `+0x6c`, `+0x68` and `+0x44`. Its other slots are `RGE_Action`'s: its slot 0x68 is the
+//! base's change of target (`FUN_140a7a230`), and it makes no sub-action. The object stop reads
+//! its progress (`FUN_140ad6170`, [`PackAction::progress`]).
 //!
-//! `set_state(6)`, which only the list's add (slot 0x28 with 1) runs, is the task
-//! pack-set-working's; the constructor (`FUN_140ad4ff0`) and its installs are the task
-//! pack-install-work-and-move's: the load is its one maker here.
+//! Its makers are the load and the constructor (`FUN_140ad4ff0`,
+//! [`crate::world::World::construct_pack`]), which a trebuchet's work order installs
+//! ([`crate::world::World::install_pack`]); its slot 0x340 and `UNIT_ORDER`'s case 1 are the tasks
+//! pack-install-move and pack-unit-order.
 
+mod install;
 mod unit;
 
 #[cfg(test)]
@@ -45,7 +48,8 @@ pub(crate) const PACK_NOT_BUILDING: GenieError =
 /// Unpack's progress has an immediate of its own with the same value (`construction::unpack`'s
 /// `DONE`).
 const DONE: PackProgress = PackProgress(100);
-/// The whole of a Pack's progress, its percent (`DAT_14330ebcc`, `FUN_140ad6170`).
+/// The whole of a Pack's progress, its percent (`DAT_14330ebcc`): `FUN_140ad6170`'s and
+/// `FUN_140ad60b0`'s (`DIVSS` at `0x140ad613e`).
 const PERCENT: f32 = PACK_PERCENT;
 
 /// A Pack's state (`+0x18`): the constructor's 0, then what `set_state` (slot 0x80,
@@ -212,8 +216,43 @@ pub(crate) fn pack_time(master: &Master) -> WholeSeconds {
 }
 
 impl PackAction {
-    /// `set_state` (slot 0x80, `0x140ad68e0`) to 1: the state alone. Its state 6 is the task
-    /// pack-set-working's (the list's add is its one caller).
+    /// The constructor's own part (`FUN_140ad4ff0`, after the base `FUN_140a73e90` with 1): made
+    /// (state 0) with no target, its status 0, its `unique_id` (`+0x6c`), the type 0x7c, its
+    /// timer 0 and then the share `progress` of its unit's master's pack `time`
+    /// ([`PackAction::take_progress`]).
+    pub(crate) fn new(unique_id: QueueId, time: WholeSeconds, progress: PackProgress) -> Self {
+        let mut pack = Self {
+            state: PackState::New,
+            target: None,
+            timer: Seconds::ZERO,
+            status: PackStatus::Idle,
+            unique_id,
+        };
+        pack.take_progress(time, progress);
+        pack
+    }
+
+    /// `FUN_140ad60b0`: the timer (`+0x44`) takes the share `progress` (its unit's `+0x88a`, a
+    /// signed short) of the pack `time` (a signed short): their `i32` product (`MOVSX`, `IMUL`)
+    /// as a float (`CVTDQ2PS`) over [`PERCENT`] (`DIVSS`). The product of two shorts never
+    /// overflows.
+    pub(crate) fn take_progress(&mut self, time: WholeSeconds, progress: PackProgress) {
+        let share = i32::from(time.get()) * i32::from(progress.get());
+        self.timer = Seconds::new(share as f32 / PERCENT);
+    }
+
+    /// `set_state(6)`'s writes of the Pack itself (`0x140ad68e0`): at work, its status 1, its
+    /// timer the share `progress` of the pack `time` ([`PackAction::take_progress`]). The game
+    /// writes the timer 0 first (`0x140ad6959`), which `FUN_140ad60b0` writes over at once.
+    pub(crate) fn go_to_work(&mut self, time: WholeSeconds, progress: PackProgress) {
+        self.state = PackState::Working;
+        self.status = PackStatus::Packing;
+        self.take_progress(time, progress);
+    }
+
+    /// `set_state` (slot 0x80, `0x140ad68e0`) to 1: the state alone, as the stop and the update
+    /// write it on the Pack they hold ([`crate::objects::unit::Unit::set_pack_state`] is the
+    /// whole routine on the list's Pack).
     const fn finish(&mut self) {
         self.state = PackState::Done;
     }

@@ -4,9 +4,11 @@ use super::*;
 use crate::commands::QueueId;
 use crate::construction::Annexes;
 use crate::map::Distance;
+use crate::map::Footprint;
 use crate::map::GroundOffset;
 use crate::map::Point;
 use crate::map::Position;
+use crate::map::spatial::Placed;
 use crate::movement::Speed;
 use crate::objects::FacetCount;
 use crate::objects::Graphics;
@@ -27,19 +29,24 @@ use crate::objects::layers::Static;
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::ActionPart;
+use crate::objects::masters::BuildableOn;
 use crate::objects::masters::BuildingMaster;
 use crate::objects::masters::CombatPart;
 use crate::objects::masters::CreatablePart;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::Masters;
+use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::TrainLocation;
 use crate::objects::sprite::{ActiveSprite, Graphic};
-use crate::objects::teardown::{HeadCode, TornDown};
+use crate::objects::teardown::{HeadCode, HeadStart, TornDown};
 use crate::objects::unit::Unit;
+use crate::orders::UNPACK_INSTALL;
 use crate::orders::Work;
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::players::PlayerKind;
+use crate::players::relation_row;
 use crate::test_ids::object_id;
 use crate::testing::class;
 use crate::testing::ids;
@@ -94,7 +101,7 @@ fn graphic(id: SpriteId) -> Graphic {
 
 /// The trebuchet master 42 of build 158041's `.dat`: a building of class 54, 150 hit points,
 /// its pack time 50 (its train location's), its work rate 4.5, its weapon range 16, its standing
-/// sprite 1180 and its transform the packed trebuchet 331.
+/// sprite 1180, its construction sprite 137 and its transform the packed trebuchet 331.
 fn trebuchet_master() -> Master {
     Master {
         id: ids::ID_42,
@@ -119,6 +126,7 @@ fn trebuchet_master() -> Master {
         }),
         building: Some(BuildingMaster {
             transform_unit: Some(ids::ID_331),
+            construction_sprite: Some(PACKING),
             ..BuildingMaster::default()
         }),
         ..Master::default()
@@ -227,8 +235,8 @@ fn world_with(list: ActionList) -> World {
 }
 
 /// A stand-in annex master `id` of type `kind` and 200 hit points, a building part for a
-/// building. The tests take 273 for a building and 379 for an animated object: the `.dat` leaves
-/// both empty in every civilisation.
+/// building. The tests take 273 for a building, 379 for an animated object and 382 for a combat
+/// object: the `.dat` leaves each empty in every civilisation.
 fn annex_master(id: i16, kind: MasterKind) -> Master {
     Master {
         id: MasterId::named(id),
@@ -929,4 +937,402 @@ fn work_order_on_class_54_under_its_pack_is_ignored() {
             "an ordered unit without a place"
         );
     }
+}
+
+/// The constructor's share of the pack time: the product of the two shorts over 100, 40 of 50
+/// giving 20; a negative progress gives a negative timer, a pack time of 0 none, and the largest
+/// product of two shorts no overflow. The Pack is made in state 0, its status 0, with no target.
+#[test]
+fn constructor_takes_its_share_of_the_pack_time() {
+    let made = |time, progress| {
+        PackAction::new(
+            QueueId::of_data(7),
+            WholeSeconds::of_data(time),
+            PackProgress::of_data(progress),
+        )
+    };
+    assert_eq!(
+        made(50, 40),
+        PackAction {
+            state: PackState::New,
+            target: None,
+            timer: Seconds::new(20.0),
+            status: PackStatus::Idle,
+            unique_id: QueueId::of_data(7),
+        }
+    );
+    assert_eq!(made(50, -3).timer, Seconds::new(-1.5));
+    assert_eq!(made(0, 40).timer, Seconds::ZERO);
+    assert_eq!(made(50, 0).timer, Seconds::ZERO);
+    assert_eq!(made(3, 1).timer, Seconds::new(0.03));
+    assert_eq!(
+        made(i16::MIN, i16::MIN).timer,
+        Seconds::new(1_073_741_824_f32 / 100.0)
+    );
+    assert_eq!(
+        made(i16::MAX, i16::MIN).timer,
+        Seconds::new(-1_073_709_056_f32 / 100.0)
+    );
+}
+
+/// `set_state(6)`'s own writes: at work, its status 1, its timer from the progress whatever it
+/// held; its target and queue id stay.
+#[test]
+fn go_to_work_takes_the_progress_and_packs() {
+    let mut pack = PackAction {
+        state: PackState::New,
+        status: PackStatus::Idle,
+        ..working(33.0)
+    };
+    pack.go_to_work(WholeSeconds::of_data(50), PackProgress::of_data(40));
+    assert_eq!(pack, working(20.0));
+}
+
+/// The trebuchet world with both objects on the map without radii: the trebuchet at (10, 10)
+/// and the villager at `at`, player 1 of `kind`.
+fn mapped(list: ActionList, kind: PlayerKind, at: Position) -> World {
+    let mut world = world_with(list);
+    world.players[1].kind = kind;
+    world.players[2].objects[ListIndex::new(0)].place = Static::at(at);
+    for (id, player, position, class, master) in [
+        (
+            TREBUCHET,
+            1,
+            Position::new(10.0, 10.0, 0.0),
+            class::CLASS_54,
+            ids::ID_42,
+        ),
+        (TARGET, 2, at, class::VILLAGER, ids::VILLAGER_MALE),
+    ] {
+        world.spatial.insert(
+            id,
+            Placed {
+                position,
+                radius: Footprint::new(0.0, 0.0),
+                class,
+                player: PlayerId::new(player),
+                master,
+                obstruction_kind: ObstructionKind::NONE,
+                buildable_on: BuildableOn::NO,
+                tall: false,
+                moves: false,
+                unknown: None,
+                obstruction: None,
+            },
+        );
+    }
+    world
+}
+
+/// The villager's place out of the trebuchet's range of 16 (22.4 away) and within it (10).
+const FAR: Position = Position::new(20.0, 30.0, 0.0);
+/// The villager's place within the trebuchet's range.
+const NEAR: Position = Position::new(20.0, 10.0, 0.0);
+
+/// The trebuchet's unit AI at the attack order and the attack action, after the order before
+/// them `last`.
+fn attacking_ai(world: &mut World, last: Option<OrderKind>) {
+    let ai = world.parts.unit_ai.get_mut(TREBUCHET).unwrap();
+    ai.last_order = last;
+    ai.current_order = Some(OrderKind::Attack);
+    ai.current_action = Some(AiAction::Attack);
+}
+
+/// The trebuchet's unit AI's order, the order before it and its action.
+fn ai_orders(world: &World) -> (Option<OrderKind>, Option<OrderKind>, Option<AiAction>) {
+    let ai = world.parts.unit_ai.get(TREBUCHET).unwrap();
+    (ai.current_order, ai.last_order, ai.current_action)
+}
+
+/// A work order with no target the world holds, at the villager's place.
+fn targetless() -> Work {
+    Work::on(None, FAR)
+}
+
+/// The Pack at work that slot 0x7e8 installs on the trebuchet from its progress 40 of 50
+/// (`FUN_140ad60b0`: 20), its queue id −1, its target `target`.
+fn installed(target: Option<ObjectId>) -> PackAction {
+    PackAction {
+        target,
+        unique_id: QueueId::NONE,
+        ..working(20.0)
+    }
+}
+
+/// `FUN_141227190` without a target the world holds: a computer's class 54 installs a Pack
+/// (`FUN_140ad4ff0` with −1, slot 0x808) and starts it (slot 0x28 with 1, `set_state(6)`): its
+/// unit AI takes the order 0x2db, the order before it kept as the last, and the action 0x277; the
+/// Pack holds the share of the unit's kept progress and no target, and the building shows its
+/// construction sprite, a new instance at its first frame.
+#[test]
+fn computer_targetless_order_installs_started_pack() {
+    for target in [None, Some(object_id(999))] {
+        let mut world = mapped(ActionList::default(), PlayerKind::Computer, FAR);
+        world.players[1].objects[AT.1].sprite =
+            Some(ActiveSprite::at_rest(graphic(STANDING), Frame::of_data(4)));
+        world.parts.actions_mut(TREBUCHET).unwrap().pack_progress = PackProgress::of_data(40);
+        attacking_ai(&mut world, Some(OrderKind::Patrol));
+        let work = Work::on(target, FAR);
+        assert_eq!(world.order_work(AT.0, AT.1, &work), Ok(()), "{target:?}");
+        assert_eq!(
+            world.parts.actions_of(TREBUCHET).list,
+            packing(installed(None))
+        );
+        assert_eq!(
+            ai_orders(&world),
+            (
+                Some(OrderKind::OnTarget),
+                Some(OrderKind::Attack),
+                Some(AiAction::OnTarget)
+            )
+        );
+        assert_eq!(shown(&world), Some((PACKING, 0)));
+        assert_eq!(heard(&world), []);
+    }
+}
+
+/// Without a target, a human's class 54 and a computer's class 51 install nothing: the order
+/// goes on to the work command at the point, which a building holding no task does not take.
+#[test]
+fn targetless_order_of_human_or_class_51_installs_nothing() {
+    let human = mapped(ActionList::default(), PlayerKind::Human, FAR);
+    let mut packed = mapped(ActionList::default(), PlayerKind::Computer, FAR);
+    packed.players[1].objects[AT.1].life.master_id = ids::ID_331;
+    for mut world in [human, packed] {
+        attacking_ai(&mut world, None);
+        assert_eq!(world.order_work(AT.0, AT.1, &targetless()), Ok(()));
+        assert!(world.parts.actions_of(TREBUCHET).list.is_empty());
+        assert_eq!(
+            ai_orders(&world),
+            (Some(OrderKind::Attack), None, Some(AiAction::Attack))
+        );
+        assert_eq!(shown(&world), Some((PACKING, 9)));
+    }
+}
+
+/// `FUN_141227190` on a target of a player the trebuchet is not allied with, out of its range:
+/// class 54 installs a Pack whatever its player, started at once, and the Pack then takes the
+/// target (its slot 0x68: the villager's workers one more). A target past state 6 the Pack holds
+/// not and takes not.
+#[test]
+fn out_of_reach_order_installs_pack_on_its_target() {
+    for (state, kept) in [
+        (ObjectState::Alive, Some(TARGET)),
+        (ObjectState::Undead, Some(TARGET)),
+        (ObjectState::Removed, None),
+    ] {
+        let mut world = mapped(ActionList::default(), PlayerKind::Human, FAR);
+        world.players[2].objects[ListIndex::new(0)].life.state = state;
+        world.parts.actions_mut(TREBUCHET).unwrap().pack_progress = PackProgress::of_data(40);
+        attacking_ai(&mut world, None);
+        let work = Work::on(Some(TARGET), FAR);
+        assert_eq!(world.order_work(AT.0, AT.1, &work), Ok(()), "{state:?}");
+        assert_eq!(held(&world), Some(installed(kept)), "{state:?}");
+        let workers = world.players[2].objects[ListIndex::new(0)].workers;
+        assert_eq!(workers.get(), i32::from(kept.is_some()), "{state:?}");
+        assert_eq!(
+            ai_orders(&world),
+            (
+                Some(OrderKind::OnTarget),
+                Some(OrderKind::Attack),
+                Some(AiAction::OnTarget)
+            )
+        );
+    }
+}
+
+/// A target within the range, or one of an ally, installs no Pack: the order goes on to the
+/// work command. A class 51 within the range unpacks, which is not made; out of it it goes on.
+#[test]
+fn order_in_reach_or_on_ally_installs_no_pack() {
+    let near = mapped(ActionList::default(), PlayerKind::Computer, NEAR);
+    let mut allied = mapped(ActionList::default(), PlayerKind::Computer, FAR);
+    allied.players[1].relations = relation_row([0, 0, 0]);
+    let work = Work::on(Some(TARGET), FAR);
+    for mut world in [near, allied] {
+        assert_eq!(world.order_work(AT.0, AT.1, &work), Ok(()));
+        assert!(world.parts.actions_of(TREBUCHET).list.is_empty());
+    }
+    let mut packed_near = mapped(ActionList::default(), PlayerKind::Computer, NEAR);
+    packed_near.players[1].objects[AT.1].life.master_id = ids::ID_331;
+    assert_eq!(
+        packed_near.order_work(AT.0, AT.1, &work),
+        Err(UNPACK_INSTALL)
+    );
+    let mut packed_far = mapped(ActionList::default(), PlayerKind::Computer, FAR);
+    packed_far.players[1].objects[AT.1].life.master_id = ids::ID_331;
+    assert_eq!(packed_far.order_work(AT.0, AT.1, &work), Ok(()));
+    assert!(packed_far.parts.actions_of(TREBUCHET).list.is_empty());
+}
+
+/// The trebuchet world placed on the map for a computer's targetless order, its master's
+/// annexes `annexes` (stand-in masters), its kept progress 40 and player 1's 300 attributes.
+fn annexed_world(list: ActionList, annexes: Vec<Master>) -> World {
+    let mut world = mapped(list, PlayerKind::Computer, FAR);
+    let mut masters = vec![trebuchet_master(), packed_master()];
+    masters.extend(annexes);
+    world.model.masters[1] = Arc::new(Masters::new(masters));
+    world.players[1].attributes = vec![Amount::ZERO; 300];
+    world.parts.actions_mut(TREBUCHET).unwrap().pack_progress = PackProgress::of_data(40);
+    world
+}
+
+/// `set_state(6)` destroys each annex in the building's slots that is a building (type 80: slot
+/// 0xd0, its hit points 0 and state 7) and keeps those of other types (an animated object, a
+/// combat object) and an empty slot; the slots stay as they were. The masters 273, 379 and 382
+/// are stand-ins.
+#[test]
+fn pack_start_destroys_building_annexes() {
+    let (tower, animal, soldier) = (
+        annex_master(273, MasterKind::BUILDING),
+        annex_master(379, MasterKind::ANIMATED),
+        annex_master(382, MasterKind::COMBAT),
+    );
+    let masters = vec![tower.clone(), animal.clone(), soldier.clone()];
+    let mut world = annexed_world(ActionList::default(), masters);
+    for (id, master) in [(701, tower.id), (702, animal.id), (703, soldier.id)] {
+        world.players[1].objects.push(Unit {
+            id: object_id(id),
+            place: Static::at(Position::new(11.0, 11.0, 0.0)),
+            life: Lifecycle {
+                state: ObjectState::Alive,
+                hp: HitPoints::new(80.0),
+                master_id: master,
+                ..Lifecycle::default()
+            },
+            ..Unit::default()
+        });
+    }
+    world.reindex();
+    let annexes = Annexes::new([
+        Some(object_id(702)),
+        Some(object_id(703)),
+        Some(object_id(701)),
+        None,
+    ]);
+    world.parts.building_mut(TREBUCHET).unwrap().annexes = annexes;
+    assert_eq!(world.order_work(AT.0, AT.1, &targetless()), Ok(()));
+    let annex = |id| {
+        let (_, annex) = world.object(object_id(id)).unwrap();
+        (annex.life.state, annex.life.hp)
+    };
+    assert_eq!(annex(701), (ObjectState::Removed, HitPoints::ZERO));
+    assert_eq!(annex(702), (ObjectState::Alive, HitPoints::new(80.0)));
+    assert_eq!(annex(703), (ObjectState::Alive, HitPoints::new(80.0)));
+    assert_eq!(world.parts.building_of(TREBUCHET).annexes, annexes);
+    assert_eq!(held(&world), Some(installed(None)));
+}
+
+/// Slot 0x808 deletes the old list before the add starts the new Pack: an old Pack at work under
+/// a wait for a foundation does nothing at its restart, then its destructor tells the unit AI its
+/// action completed and puts the building back with its annexes; the new Pack's start then shows
+/// the construction sprite and destroys the annex that is a building, and the Pack takes the
+/// target out of reach. The trebuchet is a human's: a computer's new building is not modelled.
+#[test]
+fn install_deletes_the_old_list_before_its_start() {
+    let tower = annex_master(273, MasterKind::BUILDING);
+    let mut world = annexed_world(wait_over(packing(working(60.0))), vec![]);
+    let mut annexed = trebuchet_master();
+    annexed.building.as_mut().unwrap().annexes = [None, Some(tower.id), None, None];
+    world.model.masters[1] = Arc::new(Masters::new([annexed, packed_master(), tower]));
+    world.players[1].kind = PlayerKind::Human;
+    let work = Work::on(Some(TARGET), FAR);
+    assert_eq!(world.order_work(AT.0, AT.1, &work), Ok(()));
+    assert_eq!(heard(&world), [completed()]);
+    let annexes = world.parts.building_of(TREBUCHET).annexes;
+    let [rebuilt] = annexes.ids().collect::<Vec<_>>()[..] else {
+        panic!("one annex: {annexes:?}");
+    };
+    let (_, annex) = world.object(rebuilt).unwrap();
+    assert_eq!(annex.life.state, ObjectState::Removed);
+    assert_eq!(shown(&world), Some((PACKING, 0)));
+    assert_eq!(
+        world.parts.actions_of(TREBUCHET).list,
+        packing(installed(Some(TARGET)))
+    );
+}
+
+/// A unit in state 3 or later, which slot 0x7e8 turns away first: its unit AI takes the order
+/// and the action of the constructor all the same, and the add deletes the Pack unstarted. Its
+/// take of a target would call through the freed block, an unreachable error.
+#[test]
+fn install_on_dying_unit_deletes_pack_unstarted() {
+    for target in [None, Some(TARGET)] {
+        let mut world = annexed_world(ActionList::default(), vec![]);
+        world.players[1].objects[AT.1].life.state = ObjectState::Dying;
+        attacking_ai(&mut world, None);
+        let installed = world.install_pack(AT.0, AT.1, QueueId::NONE, target);
+        match target {
+            None => assert_eq!(installed, Ok(())),
+            Some(_) => assert_eq!(
+                installed.unwrap_err().reason(),
+                "a Pack's take of its target after the add deleted it"
+            ),
+        }
+        assert!(world.parts.actions_of(TREBUCHET).list.is_empty());
+        assert_eq!(
+            ai_orders(&world),
+            (
+                Some(OrderKind::OnTarget),
+                Some(OrderKind::Attack),
+                Some(AiAction::OnTarget)
+            )
+        );
+        assert_eq!(shown(&world), Some((PACKING, 9)));
+    }
+}
+
+/// The constructor of a building without a unit AI writes no order; its queue id is the one it
+/// is given.
+#[test]
+fn constructor_without_unit_ai_orders_nothing() {
+    let mut world = annexed_world(ActionList::default(), vec![]);
+    world.parts.set_unit_ai(TREBUCHET, None);
+    assert_eq!(
+        world.construct_pack(AT.0, AT.1, QueueId::of_data(12)),
+        Ok(PackAction {
+            state: PackState::New,
+            status: PackStatus::Idle,
+            unique_id: QueueId::of_data(12),
+            ..installed(None)
+        })
+    );
+    assert!(world.parts.unit_ai.get(TREBUCHET).is_none());
+}
+
+/// Slot 0x28 with 0 does nothing; `set_state` with a state other than 6 writes the state alone;
+/// a list without a Pack has none to start.
+#[test]
+fn pack_start_with_0_and_other_states_change_the_state_alone() {
+    let made = PackAction {
+        state: PackState::New,
+        status: PackStatus::Idle,
+        ..working(3.0)
+    };
+    let mut world = annexed_world(packing(made), vec![]);
+    in_update(&mut world, AT, 0, |unit, actions, step| {
+        unit.start_pack(HeadStart::Restarted, actions, step)
+    })
+    .unwrap();
+    assert_eq!(held(&world), Some(made));
+    for state in [PackState::Done, PackState::Failed, PackState::New] {
+        in_update(&mut world, AT, 0, |unit, actions, step| {
+            unit.set_pack_state(state, actions, step)
+        })
+        .unwrap();
+        assert_eq!(
+            held(&world),
+            Some(PackAction { state, ..made }),
+            "{state:?}"
+        );
+    }
+    assert_eq!(shown(&world), Some((PACKING, 9)));
+    let mut bare = annexed_world(ActionList::default(), vec![]);
+    let started = in_update(&mut bare, AT, 0, |unit, actions, step| {
+        unit.start_pack(HeadStart::Added, actions, step)
+    });
+    assert_eq!(
+        started.unwrap_err().reason(),
+        "a Pack's start or take of its target without the Pack on its list"
+    );
 }

@@ -8,6 +8,7 @@ use crate::combat::attack::tests::own_attack;
 use crate::construction::FoundationId;
 use crate::construction::MainBuildingId;
 use crate::construction::RepairTargetId;
+use crate::construction::pack::PackState;
 use crate::construction::repair::REPAIR;
 use crate::construction::wait_solidify::{WAIT_SOLIDIFY, WaitSolidify};
 use crate::garrison::ContainerId;
@@ -71,7 +72,6 @@ use crate::objects::unit::UnitFlags;
 use crate::objects::{FacetCount, Frame, SpeedMultiplier, SpriteFlags, SpriteId};
 use crate::orders::Dispatch;
 use crate::orders::GARRISON;
-use crate::orders::PACK_OR_UNPACK;
 use crate::ownership::CaptureKind;
 use crate::ownership::artifact::Artifact;
 use crate::players::Amount;
@@ -13997,8 +13997,9 @@ fn slot_0x1b0_gives_the_kind_of_resource_by_the_unit_ai_kind() {
 /// The attack move of a trebuchet (classes 51 and 54) attacks player 2's house 70: the packed
 /// one (51) never attacks, so it takes nothing; the unpacked one's attack command is its work
 /// order on the house (slot 0x7e8), whose attack task attacks it within its reach and packs
-/// (not held) out of it. Any other class, or no target, moves to the order's point (its
-/// `MoveTo` at once).
+/// out of it, the Pack at work on the house (its stand-in master takes a building part, as every
+/// class-54 master of the `.dat` is a building). Any other class, or no target, moves to the
+/// order's point (its `MoveTo` at once).
 #[test]
 fn the_attack_move_attacks_with_trebuchet_and_moves_otherwise() {
     let (house, _) = house_and_tree();
@@ -14032,6 +14033,7 @@ fn the_attack_move_attacks_with_trebuchet_and_moves_otherwise() {
                 weapon_range: Distance::new(weapon_range),
                 ..CombatPart::default()
             }),
+            building: Some(BuildingMaster::default()),
             ..order_soldier()
         };
         master.action.get_or_insert_with(Default::default).tasks = vec![Task {
@@ -14049,7 +14051,20 @@ fn the_attack_move_attacks_with_trebuchet_and_moves_otherwise() {
     );
     assert_eq!(attacks_9(&enemy_world), Some(object_id(70)));
     let mut enemy_world = order_world(trebuchet(1.0), from_ref(&enemy));
-    assert_eq!(orders(&mut enemy_world, &attack_move), Err(PACK_OR_UNPACK));
+    assert_eq!(
+        orders(&mut enemy_world, &attack_move),
+        Ok(OrderOutcome::Taken)
+    );
+    let pack = enemy_world
+        .parts
+        .actions_of(object_id(9))
+        .list
+        .pack()
+        .copied();
+    assert_eq!(
+        pack.map(|pack| (pack.state, pack.target)),
+        Some((PackState::Working, Some(object_id(70))))
+    );
     for (class, target) in [(class::CLASS_6, 70), (class::CLASS_51, -1)] {
         let mut world = order_world(unit(class, UnitAiKind::Soldier), from_ref(&enemy));
         assert_eq!(
