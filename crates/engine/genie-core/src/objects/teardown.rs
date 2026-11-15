@@ -183,25 +183,25 @@ pub(crate) fn stop_if_moving(mut motion: MotionMut<'_>, walk: TornWalk) -> Genie
 }
 
 impl Action {
-    /// The action's destructor (slot 0) on its unit's motion layer, its top speed `top` (slot
-    /// 0x208 as the deletion starts: a teardown changes none of what it reads). A `MoveTo`'s (`FUN_140aa1f30`, an
-    /// action's sub-action's too) stops the unit (slot 0x5d0). The base teardown
-    /// (`FUN_140a73fc0`) lets the target go (slot 0x180) unless the action is quiet (`+0x60`;
-    /// the Hunt's Attack is, so only the Hunt lets its target go), then the second target. The
-    /// Build's (`FUN_140aadbf0`) first takes a counted builder (`+0x68`) out of its building's
-    /// builders (`FUN_140aaddb0`, `+0x9e8`), as the Repair's (`FUN_140ad8fd0`) a counted
-    /// repairer (`+0x6c`) its target's; the Artifact's (`FUN_140aab0d0`) lets its target go and
-    /// its `MoveTo`'s stops the unit; the Fly's (`FUN_140a84750`) gives the unit its top speed
-    /// `top` as its animation speed (slot 0x208 into `+0x7b8`); the missile's lets its target and the
-    /// object it was fired from go. The Make, the wait for a foundation (`0x140ae8780`) and the
+    /// The action's destructor (slot 0) on its unit's motion layer, its top speed `top` (slot 0x208
+    /// as it stands at this destructor's turn: a restart after an earlier destructor can show a
+    /// sprite). A `MoveTo`'s (`FUN_140aa1f30`, an action's sub-action's too) stops the unit (slot
+    /// 0x5d0). The base teardown (`FUN_140a73fc0`) lets the target go (slot 0x180) unless the
+    /// action is quiet (`+0x60`; the Hunt's Attack is, so only the Hunt lets its target go), then
+    /// the second target. The Build's (`FUN_140aadbf0`) first takes a counted builder (`+0x68`) out
+    /// of its building's builders (`FUN_140aaddb0`, `+0x9e8`), as the Repair's (`FUN_140ad8fd0`) a
+    /// counted repairer (`+0x6c`) its target's; the Artifact's (`FUN_140aab0d0`) lets its target go
+    /// and its `MoveTo`'s stops the unit; the Fly's (`FUN_140a84750`) gives the unit its top speed
+    /// `top` as its animation speed (slot 0x208 into `+0x7b8`); the missile's lets its target and
+    /// the object it was fired from go. The Make, the wait for a foundation (`0x140ae8780`) and the
     /// Transport (`FUN_140aa3b60`, the base teardown alone) hold no target; the Housing's
     /// (`0x140ac20f0`) gives its cost back at work ([`HousingAction::refund`]) and holds none
     /// either. The Pack's (`0x140ad6070` over `FUN_140ad5370`) hands itself to the caller for its
-    /// notify and the building it puts back ([`TornDown::pack`]), then its base teardown lets
-    /// its target go: it is loud. The Unpack's (`FUN_140ae67c0`) hands its status to the caller
-    /// for the building it turns back ([`TornDown::unpack`]), then its base teardown lets its
-    /// target go, loud too, and its `MoveTo`'s stops the unit: at work (status 1), the one status
-    /// its own part reads, it holds no `MoveTo` (`set_state` deletes it, and the load refuses one).
+    /// notify and the building it puts back ([`TornDown::pack`]), then its base teardown lets its
+    /// target go: it is loud. The Unpack's (`FUN_140ae67c0`) hands its status to the caller for the
+    /// building it turns back ([`TornDown::unpack`]), then its base teardown lets its target go,
+    /// loud too, and its `MoveTo`'s stops the unit: at work (status 1), the one status its own part
+    /// reads, it holds no `MoveTo` (`set_state` deletes it, and the load refuses one).
     ///
     /// [`HousingAction::refund`]: crate::construction::housing::HousingAction::refund
     ///
