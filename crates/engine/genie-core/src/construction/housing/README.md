@@ -1,9 +1,9 @@
 # `construction/housing`: the Housing action
 
 `UNIT_ORDER`'s case 3 gives a building a new Housing (`../../orders/housing_order.rs`), and so
-does the work command on a task of action type 0x7b, which no master of build 158041's `.dat`
-holds. Its start
-pays 50 wood straight from the owner's attributes; without the wood it fails (state 13). At work
+does the work command of a combat object or a building on a task of action type 0x7b, which no
+master of build 158041's `.dat` holds; an action object's list makes none. Its start pays 50
+wood straight from the owner's attributes; without the wood it fails (state 13). At work
 (state 6) its timer starts at the owner's attribute 62 and runs down by the building's work rate
 in every update, less while the building is damaged. Once the timer ran out, the building holds 5
 more headroom and its owner gains 5. Its stop gives the cost back in every state, and its

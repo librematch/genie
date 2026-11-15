@@ -96,11 +96,14 @@ impl World {
     /// `0xffffffff`, [`QueueId::NONE`]) and reads nothing of the task or the target. The unit AI
     /// hears of it (slot 0x828 with 0x7b, [`World::notify_new_action`]: `FUN_14106e4e0`'s switch
     /// names no 0x7b, so no order and no action), then the install (slot 0x808,
-    /// [`World::install_housing`]: the list's deletion, then its add, which starts the Housing
-    /// below state 3 and deletes it unstarted from state 3 on). The work command then clears the
-    /// unit AI's `+0x1d5` (not held: the task unit-ai-1d5-attack-ready) through a pointer it does
-    /// not test, and reads nothing more of the action: only the Attack's type 9 goes on to
-    /// `FUN_140a7a190`.
+    /// [`World::install_housing`]: the list's deletion, then its add, which starts the Housing).
+    /// Only a combat object or a building holds a `TRIBE_Action_List`, whose factory makes it
+    /// ([`World::start_task`]), and their slot 0x7e8 (`FUN_141227190`, [`World::order_work`])
+    /// ignores the order past state 2 (`0x14122726b`) before the work command runs: no caller
+    /// reaches the add's deletion of an unstarted Housing from state 3 on. The work command then
+    /// clears the unit AI's `+0x1d5` (not held: the task unit-ai-1d5-attack-ready) through a
+    /// pointer it does not test, and reads nothing more of the action: only the Attack's type 9
+    /// goes on to `FUN_140a7a190`.
     ///
     /// # Errors
     ///

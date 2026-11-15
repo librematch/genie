@@ -16,7 +16,7 @@ The files hold the orders by kind:
   `unit_order.rs`, `actions.rs`.
 - `housing_order.rs`: `UNIT_ORDER`'s Housing (case 3), which gives a building that is not at
   work a new Housing (`construction/housing/`), and the work command's Housing for a task of
-  action type 0x7b.
+  action type 0x7b, which only a combat object's or a building's list makes.
 - `town_bell.rs`: what a villager worked on before an order took it away, for the way back;
   `town_bell/` rings the town bell and ends it.
 - `start_work.rs`: the Empire Wars start, which puts every idle villager to work in the first tick.

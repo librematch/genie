@@ -1,4 +1,5 @@
-//! `UNIT_ORDER`'s Housing and the work command's on the house of `construction::housing`'s tests.
+//! `UNIT_ORDER`'s Housing and the work command's on the house of `construction::housing`'s tests,
+//! and an action object's Housing task on `world::tests`'s mule cart.
 
 use super::*;
 use crate::commands::{Shift, UnitList, UnitOrderAction, UnitOrderCommand};
@@ -9,15 +10,18 @@ use crate::construction::housing::{HousingAction, HousingState};
 use crate::garrison::GarrisonScope;
 use crate::map::Point;
 use crate::map::Position;
+use crate::map::spatial::Placed;
 use crate::objects::actions::ActionList;
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::Master;
+use crate::objects::masters::Masters;
 use crate::objects::masters::TargetOwner;
 use crate::objects::masters::Task;
 use crate::objects::unit::Unit;
 use crate::orders::MasterSwap;
 use crate::orders::Work;
 use crate::orders::work::WORK_WITHOUT_UNIT_AI;
+use crate::players::Amount;
 use crate::players::PlayerKind;
 use crate::production::UnitIndex;
 use crate::production::{Entry, MakeObj, MakeTech, MakeTechState, Making, Production, QueueLength};
@@ -34,7 +38,9 @@ use crate::unit_ai::Notifies;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAi;
 use crate::world::Seconds;
+use crate::world::tests::cart_world;
 use std::iter::once;
+use std::sync::Arc;
 
 /// The order to the house alone.
 fn order(world: &mut World) -> GenieResult<()> {
@@ -281,6 +287,13 @@ fn unit_order_runs_housing_and_ignores_other_bytes() {
     assert_eq!((held(&other), wood(&other)), (None, 120.0));
 }
 
+/// The mule cart's list index in [`cart_world`]: after the forager, the house's foundation and
+/// the town centre.
+const CART: ListIndex = ListIndex::new(3);
+
+/// The mule cart of [`cart_world`].
+const CART_ID: ObjectId = object_id(750);
+
 /// The second house of player 1 that the work command names (object 701).
 const NAMED: ObjectId = object_id(701);
 
@@ -430,14 +443,78 @@ fn work_command_housing_without_unit_ai_faults_after_install() {
     );
 }
 
-/// From state 3 on the install's add deletes the new Housing unstarted: the list holds none,
-/// and the wood stays.
+/// [`cart_world`]'s moving mule cart 750 under a stand-in master 382 of an action object (type
+/// 40; an id that build 158041's `.dat` leaves empty in every civilisation) of the cart master's
+/// speed and footprint, whose one task is the stand-in house's Housing task; its owner holds 120
+/// wood.
+fn action_object_world() -> World {
+    let mut world = cart_world();
+    world.players[1].attributes[slots().attribute.wood.index()] = Amount::new(120.0);
+    let stand_in = master_id(382);
+    for masters in &mut world.model.masters {
+        let mut action_object = masters.get(ids::MASTER_1808).unwrap().clone();
+        action_object.id = stand_in;
+        action_object.kind = MasterKind::ACTION;
+        action_object.action.as_mut().unwrap().tasks = vec![housing_task()];
+        *masters = Arc::new(Masters::new(masters.iter().cloned().chain([action_object])));
+    }
+    world.players[1].objects[CART].life.master_id = stand_in;
+    let placed = *world.spatial.get(CART_ID).unwrap();
+    world.spatial.change_master(
+        CART_ID,
+        Placed {
+            master: stand_in,
+            ..placed
+        },
+    );
+    world
+}
+
+/// An action object's list is an `RGE_Action_List` (slot 0x840, `FUN_14106c380`), whose factory
+/// (`FUN_140a97e00`) makes no action of a Housing task: the work command moves the object to the
+/// point (slot 0x138) instead, its unit AI told of the move (slot 0x828 with 1), and its owner
+/// pays for no Housing; types 50 and 60 move too. A combat object's or a building's
+/// `TRIBE_Action_List` (types 70 and 80, slot 0x840 `FUN_141210890`) takes a Housing there.
 #[test]
-fn work_command_housing_of_dying_building_installs_none() {
-    let mut world = work_world(Some(attacking()), ActionList::default());
-    world.players[1].objects[AT.1].life.state = ObjectState::Dying;
-    work(&mut world, Some(NAMED)).unwrap();
-    assert_eq!((held(&world), wood(&world)), (None, 120.0));
+fn work_command_housing_task_of_action_object_moves_without_housing() {
+    let worked = |kind: MasterKind| {
+        let mut world = action_object_world();
+        for masters in &mut world.model.masters {
+            Arc::make_mut(masters).get_mut(master_id(382)).unwrap().kind = kind;
+        }
+        let result = world.start_task(
+            PlayerId::new(1),
+            CART,
+            (None, POINT),
+            &housing_task(),
+            Notifies::Cleared,
+        );
+        let list = &world.parts.actions_of(CART_ID).list;
+        let ai = world.parts.unit_ai.get(CART_ID).unwrap();
+        (
+            result,
+            (list.housing().is_some(), list.move_to().is_some()),
+            (ai.current_order, ai.current_action),
+            wood(&world),
+        )
+    };
+    assert_eq!(
+        worked(MasterKind::ACTION),
+        (
+            Ok(()),
+            (false, true),
+            (Some(OrderKind::Move), Some(AiAction::Move)),
+            120.0
+        )
+    );
+    for action_object in [MasterKind::RGE_COMBAT, MasterKind::MISSILE] {
+        let (_, actions, _, wood) = worked(action_object);
+        assert_eq!((actions, wood), ((false, true), 120.0));
+    }
+    for tribe_object in [MasterKind::COMBAT, MasterKind::BUILDING] {
+        let (_, actions, _, wood) = worked(tribe_object);
+        assert_eq!((actions, wood), ((true, false), 70.0));
+    }
 }
 
 /// A Housing on top holds no task (`+0x48`, which its constructor leaves null), so the work's

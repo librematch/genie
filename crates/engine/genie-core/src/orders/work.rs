@@ -21,6 +21,7 @@ use crate::objects::actions::Action as ActionsAction;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::Task;
 use crate::objects::masters::player_masters;
 use crate::objects::masters::work_master;
@@ -449,7 +450,11 @@ impl World {
 
     /// The action list's factory (slot 0x10) for the work's `task` on `target`: the Enter,
     /// Attack, Hunt, Build, Repair, Gather, Transport or Housing starts; a mule cart's task makes
-    /// no action (the move without one, [`World::work_move`]).
+    /// no action (the move without one, [`World::work_move`]). The Housing is
+    /// `TRIBE_Action_List`'s alone (`FUN_140aca4b0` case 0x7b): an action object (types 40 to 60)
+    /// holds an `RGE_Action_List` (its class's slot 0x840, `FUN_14106c380`), whose factory
+    /// (`FUN_140a97e00`) answers none for a task of 0x7b (its `default`), so its work command
+    /// moves too.
     pub(super) fn start_task(
         &mut self,
         player: PlayerId,
@@ -462,7 +467,13 @@ impl World {
             // the factory makes no action of a mule cart's task: the move without one
             CART_TASK => self.work_move(player, idx, target, point, notifies),
             TRANSPORT => self.start_transport((player, idx), (target, point), task, notifies),
-            ActionKind::HOUSING => self.start_housing(player, idx, target, point, notifies),
+            ActionKind::HOUSING => {
+                let unit = &self.players.live(player, idx)?;
+                if unit.master(self.master_tables(), player)?.kind < MasterKind::COMBAT {
+                    return self.work_move(player, idx, target, point, notifies);
+                }
+                self.start_housing(player, idx, target, point, notifies)
+            }
             ENTER | ATTACK_TASK | HUNT | ActionKind::BUILD | REPAIR | GATHER => {
                 let target = target.ok_or(TERRAIN_TASK)?;
                 self.start_object_task(player, idx, (target, point), task, notifies)
@@ -501,11 +512,11 @@ impl World {
     }
 
     /// The work command without an action (`FUN_14106ff70`: no task, or one the action list's
-    /// factory makes no action of, the mule cart's 0x99): a unit whose master moves (slot 0xe8,
-    /// its speed `+0x740`) is told of a move (slot 0x828, its notifies cleared with
-    /// [`Notifies::Cleared`]) and, in state 2 or of class 51, moves to the target or the point
-    /// (slot 0x138, [`World::move_point_order`], [`World::move_to_object`]); one that does not
-    /// move does nothing.
+    /// factory makes no action of, the mule cart's 0x99 and an action object's 0x7b): a unit
+    /// whose master moves (slot 0xe8, its speed `+0x740`) is told of a move (slot 0x828, its
+    /// notifies cleared with [`Notifies::Cleared`]) and, in state 2 or of class 51, moves to the
+    /// target or the point (slot 0x138, [`World::move_point_order`], [`World::move_to_object`]);
+    /// one that does not move does nothing.
     pub(super) fn work_move(
         &mut self,
         player: PlayerId,
