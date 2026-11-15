@@ -472,15 +472,21 @@ fn action_object_world() -> World {
 
 /// An action object's list is an `RGE_Action_List` (slot 0x840, `FUN_14106c380`), whose factory
 /// (`FUN_140a97e00`) makes no action of a Housing task: the work command moves the object to the
-/// point (slot 0x138) instead, its unit AI told of the move (slot 0x828 with 1), and its owner
-/// pays for no Housing; types 50 and 60 move too. A combat object's or a building's
-/// `TRIBE_Action_List` (types 70 and 80, slot 0x840 `FUN_141210890`) takes a Housing there.
+/// point (slot 0x138) instead, and its owner pays for no Housing; types 50 and 60 move too. An
+/// action object holds no unit AI (only a `TRIBE_Combat_Object` and a `TRIBE_Building_Object`
+/// save one), so slot 0x828 (`FUN_14106e4e0`, its `+0x6b0` null) tells nothing. A combat
+/// object's or a building's `TRIBE_Action_List` (types 70 and 80, slot 0x840 `FUN_141210890`),
+/// beside the unit AI it holds, takes a Housing there.
 #[test]
 fn work_command_housing_task_of_action_object_moves_without_housing() {
     let worked = |kind: MasterKind| {
         let mut world = action_object_world();
         for masters in &mut world.model.masters {
             Arc::make_mut(masters).get_mut(master_id(382)).unwrap().kind = kind;
+        }
+        // only the TRIBE classes (types 70 and 80) hold a unit AI
+        if kind < MasterKind::COMBAT {
+            world.parts.set_unit_ai(CART_ID, None);
         }
         let result = world.start_task(
             PlayerId::new(1),
@@ -490,30 +496,22 @@ fn work_command_housing_task_of_action_object_moves_without_housing() {
             Notifies::Cleared,
         );
         let list = &world.parts.actions_of(CART_ID).list;
-        let ai = world.parts.unit_ai.get(CART_ID).unwrap();
         (
-            result,
+            result.map_err(|error| error.reason()),
             (list.housing().is_some(), list.move_to().is_some()),
-            (ai.current_order, ai.current_action),
+            world.parts.unit_ai.get(CART_ID).is_some(),
             wood(&world),
         )
     };
-    assert_eq!(
-        worked(MasterKind::ACTION),
-        (
-            Ok(()),
-            (false, true),
-            (Some(OrderKind::Move), Some(AiAction::Move)),
-            120.0
-        )
-    );
-    for action_object in [MasterKind::RGE_COMBAT, MasterKind::MISSILE] {
-        let (_, actions, _, wood) = worked(action_object);
-        assert_eq!((actions, wood), ((false, true), 120.0));
+    for action_object in [
+        MasterKind::ACTION,
+        MasterKind::RGE_COMBAT,
+        MasterKind::MISSILE,
+    ] {
+        assert_eq!(worked(action_object), (Ok(()), (false, true), false, 120.0));
     }
     for tribe_object in [MasterKind::COMBAT, MasterKind::BUILDING] {
-        let (_, actions, _, wood) = worked(tribe_object);
-        assert_eq!((actions, wood), ((true, false), 70.0));
+        assert_eq!(worked(tribe_object), (Ok(()), (true, false), true, 70.0));
     }
 }
 
