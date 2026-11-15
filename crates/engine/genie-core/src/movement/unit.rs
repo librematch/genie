@@ -18,10 +18,11 @@ use crate::movement::footprint_gap_squared;
 use crate::movement::move_to::MoveStep;
 use crate::movement::move_to::Patience;
 use crate::movement::move_to::StepEnd;
-use crate::movement::move_to::{MoveTo, Shown, Shows};
+use crate::movement::move_to::{MoveTo, MoveToAction, Shown, Shows};
 use crate::movement::step::VelocityStep;
 use crate::movement::stop_mover;
 use crate::movement::{GroupSpeed, Me};
+use crate::objects::ObjectId;
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
 use crate::objects::actions::Action as ActionsAction;
@@ -43,6 +44,7 @@ use crate::unit_ai::UnitStance;
 use crate::world::NO_ATTRIBUTE;
 use crate::world::SPEED_EPSILON;
 use crate::world::Unread;
+use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::lets::release;
@@ -334,9 +336,6 @@ impl Unit {
     /// that is not quiet), one past state 6 and one of a recyclable id, which `FUN_140a78450`
     /// passes over but slot 0x68's own lookup (`FUN_1415417a0`) finds; a target the world no
     /// longer holds is not. Returns the update's code when it ends there (4: the list keeps it).
-    ///
-    /// [`World::target_state`]: crate::world::World::target_state
-    /// [`MoveToAction::check_held`]: crate::movement::move_to::MoveToAction::check_held
     fn own_move_held(
         &mut self,
         actions: &mut Action,
@@ -358,7 +357,8 @@ impl Unit {
     }
 
     /// The own `MoveTo`'s update (`0x140aa2a70`): its state 3 asks the unit's AI for a path to
-    /// its point (the goal, or the target's place); none without a `MoveTo`.
+    /// its point (the goal, or the target's place, [`World::start_ask`]); none without a
+    /// `MoveTo`.
     fn own_move_step(
         &mut self,
         actions: &mut Action,
@@ -368,25 +368,11 @@ impl Unit {
     ) -> GenieResult<MoveStep> {
         Ok(match actions.list.move_to_mut() {
             Some(move_to) => {
-                // its state 3 reads the unit's AI for the path it asks (0x140aa2a70), with its
-                // point: its own, or the target's place (a target gone fails the update first)
-                let point = match move_to.target {
-                    None => Some(move_to.point.ground()),
-                    Some(id) => step
-                        .world
-                        .spatial
-                        .get(id)
-                        .map(|placed| placed.position.ground()),
-                };
-                let ask = match point {
-                    Some(point) if move_to.state == MoveTo::Start => UnitAi::path_ask(
-                        step.world.parts.unit_ai.get_mut(self.id),
-                        self.place.position().ground(),
-                        point,
-                        &step.world.model.tuning.unit_ai,
-                    ),
-                    _ => PathAsk::default(),
-                };
+                // its state 3 reads the unit's AI for the path it asks (0x140aa2a70), after the
+                // first check (own_move_held) kept or cleared the target
+                let ask = step
+                    .world
+                    .start_ask(move_to, self.id, self.place.position().ground());
                 // its set_state 1 and 13 show slot 0x798's sprite; slot 0x68 takes the master's
                 // standing sprite for a null one
                 let master = object_master(
@@ -622,5 +608,29 @@ impl Unit {
             );
         }
         Ok(())
+    }
+}
+
+impl World {
+    /// What the unit AI of the unit `unit` at `at` asks of the path that the start (state 3) of
+    /// its `MoveTo` `move_to` plans (`0x140aa2a70`, [`UnitAi::path_ask`]), to the point the start
+    /// measures to by the target's state as the world holds it ([`MoveToAction::start_point`],
+    /// [`World::target_state`]). Where the start asks nothing (another state, or a target that
+    /// the first check lets go), the default ask, which reads and zeroes no saved patrol.
+    pub(crate) fn start_ask(
+        &mut self,
+        move_to: &MoveToAction,
+        unit: ObjectId,
+        at: Point,
+    ) -> PathAsk {
+        match move_to.start_point(self.target_state(move_to.target), &self.spatial) {
+            Some(point) => UnitAi::path_ask(
+                self.parts.unit_ai.get_mut(unit),
+                at,
+                point,
+                &self.model.tuning.unit_ai,
+            ),
+            None => PathAsk::default(),
+        }
     }
 }

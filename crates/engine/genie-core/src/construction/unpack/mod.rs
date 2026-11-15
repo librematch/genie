@@ -47,7 +47,9 @@ use crate::world::WholeSeconds;
 use derive_more::Display;
 use genie_diff::Diff;
 
-/// The progress of an Unpack in state 1 (`FUN_140ae6cd0`'s `MOV EAX, 0x64`): all of it.
+/// The progress of an Unpack in state 1 (`FUN_140ae6cd0`'s `MOV EAX, 0x64`): all of it. The
+/// Pack's progress has an immediate of its own with the same value (`construction::pack`'s
+/// `DONE`).
 const DONE: PackProgress = PackProgress::of_data(100);
 /// The whole of an Unpack's progress, its percent (`DAT_14330ebcc`, `FUN_140ae6cd0`).
 const PERCENT: f32 = UNPACK_PERCENT;

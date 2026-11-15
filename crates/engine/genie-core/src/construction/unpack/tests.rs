@@ -6,12 +6,14 @@ use crate::construction::Annexes;
 use crate::gathering::hunt::tests::walker;
 use crate::gathering::make::MakeAction;
 use crate::map::GroundOffset;
+use crate::map::spatial::Placed;
 use crate::movement::Me;
 use crate::movement::MoveStats;
 use crate::movement::Mover;
 use crate::movement::PathFlags;
 use crate::movement::Speed;
 use crate::movement::TopSpeed;
+use crate::movement::WaypointLevel;
 use crate::movement::move_to::{MOVE_TO, MoveTo};
 use crate::objects::ActionState;
 use crate::objects::FacetCount;
@@ -34,6 +36,7 @@ use crate::objects::layers::Static;
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::ActionPart;
+use crate::objects::masters::BuildableOn;
 use crate::objects::masters::BuildingMaster;
 use crate::objects::masters::CombatPart;
 use crate::objects::masters::CreatablePart;
@@ -42,6 +45,7 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::Masters;
 use crate::objects::masters::MovingPart;
+use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::Task;
 use crate::objects::masters::TrainLocation;
 use crate::objects::sprite::{ActiveSprite, Graphic};
@@ -58,6 +62,7 @@ use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderPriority;
 use crate::unit_ai::OrderTargetKind;
+use crate::unit_ai::PatrolPath;
 use crate::unit_ai::QueuedOrder;
 use crate::unit_ai::UnitAi;
 use crate::world::FrameSeed;
@@ -856,6 +861,8 @@ fn dying_unit_deletes_its_unpack_at_work() {
     assert_eq!(held(&world), None);
     assert!(world.parts.actions_of(TREBUCHET).list.is_empty());
     assert_eq!(shown(&world).map(|(id, _)| id), Some(CONSTRUCTION));
+    let villager = &world.players[2].objects[ListIndex::new(0)];
+    assert_eq!(villager.workers.get(), 0);
 }
 
 /// A walk on its way (0) or failed (3) unpacks within reach of its target; out of it a failed one
@@ -974,6 +981,83 @@ fn walk_start_reads_its_unit_ai_and_posts_units_in_the_way() {
     in_the_way(&mut waits);
     assert_eq!(updated(&mut waits, 100), Ok(HeadCode::Keeps));
     assert_eq!(heard(&waits), []);
+}
+
+/// A walk to its target in state 3 asks the unit AI's patrol turn of the target's place, which
+/// its start takes as its point, not of the point it last walked to: on a patrol without a saved
+/// one, the villager 22.4 off on the map goes back and forth though the old point (11, 11) lay
+/// 1.4 off. A target past state 6, on the map still, ends the walk's update before its start: no
+/// path is asked, and the saved patrol stays.
+#[test]
+fn walk_start_to_target_asks_of_its_place() {
+    // the top level's flags, which the ask gives (a planned level's are a new path's)
+    let top_flags = |world: &World| {
+        world
+            .parts
+            .mover_of(TREBUCHET)
+            .unwrap()
+            .paths
+            .iter()
+            .find(|path| path.level == WaypointLevel::Top)
+            .map(|path| path.path_flags)
+    };
+    let patrol = |world: &mut World, saved: Option<PatrolPath>| {
+        let ai = world.parts.unit_ai.get_mut(TREBUCHET).unwrap();
+        ai.current_order = Some(OrderKind::Patrol);
+        ai.patrol_path = saved;
+    };
+    let stale = UnpackAction {
+        state: UnpackState::Moving {
+            move_to: Some(MoveToAction {
+                target: Some(TARGET),
+                point: Position::new(11.0, 11.0, 0.0),
+                ..MoveToAction::sub_in(MoveTo::Start)
+            }),
+        },
+        ..walking(MoveTo::Start)
+    };
+    let on_map = |world: &mut World| {
+        let villager = &world.players[2].objects[ListIndex::new(0)];
+        let placed = Placed {
+            position: villager.position(),
+            radius: Footprint::new(0.2, 0.2),
+            class: class::VILLAGER,
+            player: PlayerId::new(2),
+            master: ids::VILLAGER_MALE,
+            obstruction_kind: ObstructionKind::NONE,
+            buildable_on: BuildableOn::NO,
+            tall: false,
+            moves: false,
+            unknown: None,
+            obstruction: None,
+        };
+        world.spatial.insert(TARGET, placed);
+    };
+    let mut world = packed_with(unpacking(stale));
+    on_map(&mut world);
+    patrol(&mut world, None);
+    assert_eq!(updated(&mut world, 100), Ok(HeadCode::Keeps));
+    let flags = top_flags(&world).unwrap();
+    assert!(flags.contains(PathFlags::LOOPS | PathFlags::BACK_AND_FORTH));
+    let walked = held(&world).unwrap();
+    assert_eq!(
+        walked.state.move_to().map(|move_to| move_to.point),
+        Some(Position::new(20.0, 30.0, 0.5))
+    );
+    let mut gone = trebuchet_world(
+        ids::ID_331,
+        unpacking(walking(MoveTo::Start)),
+        ObjectState::Removed,
+    );
+    on_map(&mut gone);
+    patrol(&mut gone, Some(PatrolPath::default()));
+    assert_eq!(updated(&mut gone, 100), Ok(HeadCode::Keeps));
+    let ai = gone.parts.unit_ai.get(TREBUCHET).unwrap();
+    assert_eq!(ai.patrol_path, Some(PatrolPath::default()));
+    assert_eq!(
+        gone.parts.mover_of(TREBUCHET).unwrap().paths,
+        walker().paths
+    );
 }
 
 /// The list's deletion outside the step (`FUN_140a98620`, [`World::clear_actions`]) and the

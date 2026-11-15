@@ -5,6 +5,7 @@ use crate::combat::abilities::Look;
 use crate::construction::build::CART_TASK;
 use crate::map::Distance;
 use crate::map::Footprint;
+use crate::map::Point;
 use crate::map::Position;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Well512;
@@ -76,6 +77,12 @@ pub struct MoveToAction {
 /// A `MoveTo` to an object the world does not hold.
 pub(crate) const TARGET_LACKING: GenieError =
     GenieError::unsupported("a MoveTo to an object the world lacks");
+
+/// A held target in `state` that the update's first check lets go: one past state 6 (`CMP byte
+/// [RAX + 0x640], 7`, `JNC`, `0x140aa2b0d`).
+fn lets_go(state: ObjectState) -> bool {
+    ObjectState::Undead < state
+}
 
 /// `FUN_140aa0df0`'s test of a `MoveTo`'s target object of master `master` in `state`:
 /// livestock (`livestock`, the unit's class 58) moving to a town centre (master 109) holds none,
@@ -530,7 +537,7 @@ impl MoveToAction {
                 self.target = None;
                 Ok(None)
             }
-            Some(object_state) if ObjectState::Undead < object_state => {
+            Some(object_state) if lets_go(object_state) => {
                 self.target = None;
                 if self.voice.is_quiet() {
                     return Ok(Some(UpdateCode::Code5));
@@ -542,6 +549,29 @@ impl MoveToAction {
                 Ok(Some(UpdateCode::Code4))
             }
             Some(_) => Ok(None),
+        }
+    }
+
+    /// The point on the ground that its update's start (state 3, `0x140aa2a70`) measures the unit
+    /// AI's patrol turn to ([`crate::unit_ai::UnitAi::path_ask`]), by the object state of its
+    /// target `target_state` as its first check reads it ([`MoveToAction::check_held`]). None in
+    /// another state, and where that check ends the update before the start (a target past state
+    /// 6). A target the check keeps gives its place in `world`, which the start writes into
+    /// `+0x38` to `+0x40` before it asks (none where `world` does not place it). Its own point
+    /// (`+0x38`, `+0x3c`) is the start's without a target and for a target the check clears.
+    #[must_use]
+    pub(crate) fn start_point(
+        &self,
+        target_state: Option<ObjectState>,
+        world: &Spatial,
+    ) -> Option<Point> {
+        if self.state != MoveTo::Start {
+            return None;
+        }
+        match (self.target, target_state) {
+            (Some(_), Some(object_state)) if lets_go(object_state) => None,
+            (Some(id), Some(_)) => world.get(id).map(|placed| placed.position.ground()),
+            _ => Some(self.point.ground()),
         }
     }
 
@@ -1059,6 +1089,42 @@ mod tests {
             lacking.start_gap(&world, me, ground).unwrap_err().reason(),
             TARGET_LACKING.reason()
         );
+    }
+
+    /// The start's point for the unit AI's patrol turn (`0x140aa2a70`): a held target's place in
+    /// state 6 or before (not the point it last walked to), none for one past state 6 (the first
+    /// check ends the update); its own point without a target and for a target the world's table
+    /// does not hold; none in another state than the start, and for a target the world does not
+    /// place.
+    #[test]
+    fn start_point_is_kept_target_place_else_own_point() {
+        let mut world = Spatial::new(GridSize::new(120, 120));
+        world.insert(object_id(9186), sheep(35.0, 40.0));
+        let walking = |state: MoveTo, target: Option<ObjectId>| MoveToAction {
+            point: Position::new(30.0, 88.0, 5.0),
+            target,
+            ..MoveToAction::sub_in(state)
+        };
+        let own = Some(Point::new(30.0, 88.0));
+        let sheep_at = Some(Point::new(35.0, 40.0));
+        let (sheep_id, unplaced) = (Some(object_id(9186)), Some(object_id(9187)));
+        for (state, target, target_state, point) in [
+            (MoveTo::Start, sheep_id, Some(ObjectState::Alive), sheep_at),
+            (MoveTo::Start, sheep_id, Some(ObjectState::Undead), sheep_at),
+            (MoveTo::Start, sheep_id, Some(ObjectState::Removed), None),
+            (MoveTo::Start, sheep_id, Some(ObjectState::Gone), None),
+            (MoveTo::Start, sheep_id, None, own),
+            (MoveTo::Start, None, None, own),
+            (MoveTo::Start, unplaced, Some(ObjectState::Alive), None),
+            (MoveTo::Moving, sheep_id, Some(ObjectState::Alive), None),
+            (MoveTo::Waiting, None, None, None),
+        ] {
+            assert_eq!(
+                walking(state, target).start_point(target_state, &world),
+                point,
+                "{state:?} {target:?} {target_state:?}"
+            );
+        }
     }
 
     /// `FUN_140aa0df0` on an object: a live target is held (the caller takes it); a target in

@@ -20,7 +20,6 @@ use crate::math::conversions::cvttss2si;
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered, maxss};
 use crate::math::rng::{Stream, Well512};
 use crate::movement::Me;
-use crate::movement::PathAsk;
 use crate::movement::Speed;
 use crate::movement::move_to::{ListUpdate, SubCode, update_sub_actions};
 use crate::movement::move_to::{MoveTo, MoveToReads, SpriteReads};
@@ -491,12 +490,12 @@ impl TransportAction {
 
     /// The update of its `MoveTo` sub-action (`FUN_140a992b0`) on the step
     /// ([`MoveToAction::sub_update`](crate::movement::move_to::MoveToAction::sub_update)): state 3
-    /// asks for its path by what the unit's AI asks of the path (`0x140aa2a70`,
-    /// [`UnitAi::path_ask`]) and shows its sprite; state 4 moves; after either the units in the way
-    /// go to the unit AI at once (notify 0x215). A motion step that gives up fails it
-    /// (`set_state(13)`: only a human player's villager waits). Its code: [`SubCode::Done`] once
-    /// it ended at the point or without one ("There is no list"), [`SubCode::Failed`] once it
-    /// failed, else [`SubCode::UnderWay`].
+    /// asks for its path by what the unit's AI asks of the path to the `MoveTo`'s point
+    /// (`0x140aa2a70`, [`World::start_ask`]) and shows its sprite; state 4 moves; after either the
+    /// units in the way go to the unit AI at once (notify 0x215). A motion step that gives up
+    /// fails it (`set_state(13)`: only a human player's villager waits). Its code:
+    /// [`SubCode::Done`] once it ended at the point or without one ("There is no list"),
+    /// [`SubCode::Failed`] once it failed, else [`SubCode::UnderWay`].
     ///
     /// # Errors
     ///
@@ -507,25 +506,13 @@ impl TransportAction {
         unit: &mut Unit,
         me: Me,
     ) -> GenieResult<SubCode> {
-        let Some(state) = self
-            .state
-            .move_to()
-            .map(|move_to_action| move_to_action.state)
-        else {
+        let Some(move_to_action) = self.state.move_to().copied() else {
             return Ok(SubCode::Done);
         };
-        let start = state == MoveTo::Start;
-        let walks = start || state == MoveTo::Moving;
-        let ask = if start {
-            UnitAi::path_ask(
-                step.world.parts.unit_ai.get_mut(unit.id),
-                unit.place.position().ground(),
-                self.point.ground(),
-                &step.world.model.tuning.unit_ai,
-            )
-        } else {
-            PathAsk::default()
-        };
+        let walks = matches!(move_to_action.state, MoveTo::Start | MoveTo::Moving);
+        let ask = step
+            .world
+            .start_ask(&move_to_action, unit.id, unit.place.position().ground());
         let how = ListUpdate {
             ask,
             ..ListUpdate::default()

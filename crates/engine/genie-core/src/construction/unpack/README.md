@@ -38,5 +38,5 @@ the task unpack-install-sites', its `set_state(11)` the task unpack-set-moving's
 ## How it connects
 
 <!-- uses -->
-- Uses: [`commands`](../../commands/), [`map`](../../map/), [`math`](../../math/), [`movement`](../../movement/), [`objects`](../../objects/), [`orders`](../../orders/), [`players`](../../players/), [`unit_ai`](../../unit_ai/), [`world`](../../world/).
+- Uses: [`commands`](../../commands/), [`map`](../../map/), [`math`](../../math/), [`movement`](../../movement/), [`objects`](../../objects/), [`orders`](../../orders/), [`players`](../../players/), [`world`](../../world/).
 <!-- /uses -->

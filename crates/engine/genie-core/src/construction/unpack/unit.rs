@@ -8,7 +8,6 @@ use crate::construction::pack::{PACK_NOT_BUILDING, PackTime, pack_time};
 use crate::construction::unpack::{Reach, UnpackAction, UnpackState, UnpackStatus};
 use crate::math::rng::Stream;
 use crate::movement::Me;
-use crate::movement::PathAsk;
 use crate::movement::footprint_gap_squared;
 use crate::movement::move_to::{GiveUp, ListUpdate, MoveTo, SubCode, update_sub_actions};
 use crate::objects::ListIndex;
@@ -23,7 +22,6 @@ use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
 use crate::orders::ActionsOnChange;
 use crate::players::PlayerId;
-use crate::unit_ai::UnitAi;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::lets::release;
@@ -143,7 +141,7 @@ impl Unit {
                 (self.id, self.life.master_id),
                 step.world.model.masters.of(step.player),
             )?;
-            let instant = step.world.model.tuning.unpack.instant_work;
+            let instant = Seconds::new(step.world.model.tuning.unpack.instant_work);
             (self.building_work(master, step, instant), pack_time(master))
         };
         let reached = unpack.work(work, time);
@@ -230,7 +228,8 @@ impl Unit {
 
     /// The update of the Unpack's sub-action list (`FUN_140a992b0`: its quiet `MoveTo`'s,
     /// [`update_sub_actions`]) and its [`SubCode`]: in state 3 its path asks what the unit's AI
-    /// asks of it ([`UnitAi::path_ask`], `0x140aa2a70`); a human player's villager waits once
+    /// asks of it ([`World::start_ask`], `0x140aa2a70`: toward a held target's place, and nothing
+    /// where the `MoveTo`'s first check lets its target go); a human player's villager waits once
     /// before it gives up, and the AI's stance decides the wait ([`GiveUp`], an AI's 0 without
     /// one); after a start or a move the units in the unit's way go to its unit AI at once (notify
     /// 0x215). Done for a list without a `MoveTo` ("There is no list.").
@@ -244,19 +243,9 @@ impl Unit {
         step: &mut Step<'_>,
         me: Me,
     ) -> GenieResult<SubCode> {
-        let walked = unpack
-            .state
-            .move_to()
-            .map(|move_to| (move_to.state, move_to.point));
-        let ask = match walked {
-            Some((MoveTo::Start, point)) => UnitAi::path_ask(
-                step.world.parts.unit_ai.get_mut(self.id),
-                self.place.position().ground(),
-                point.ground(),
-                &step.world.model.tuning.unit_ai,
-            ),
-            _ => PathAsk::default(),
-        };
+        let walked = unpack.state.move_to().copied();
+        let at = self.place.position().ground();
+        let ask = walked.map_or_default(|move_to| step.world.start_ask(&move_to, self.id, at));
         let class = self.master(step.world.master_tables(), step.player)?.class;
         let gives_up = GiveUp::of(
             step.world.players.player(step.player)?.kind,
@@ -273,7 +262,7 @@ impl Unit {
             // a state that does not walk has no sub-action: its list's update is the empty one's
             None => update_sub_actions(&mut None, step, self, me, how)?,
         };
-        if matches!(walked, Some((MoveTo::Start | MoveTo::Moving, _))) {
+        if walked.is_some_and(|move_to| matches!(move_to.state, MoveTo::Start | MoveTo::Moving)) {
             self.post_in_the_way(
                 step.world.parts.motion.mover_mut(self.id),
                 &mut step.world.parts.unit_ai,

@@ -185,7 +185,7 @@ impl Unit {
                 (self.id, self.life.master_id),
                 step.world.model.masters.of(step.player),
             )?;
-            let instant = step.world.model.tuning.pack.instant_work;
+            let instant = Seconds::new(step.world.model.tuning.pack.instant_work);
             (
                 self.building_work(master, step, instant),
                 PackMaster::of(master)?,
@@ -212,9 +212,14 @@ impl Unit {
     ///
     /// [`PackTuning::instant_work`]: crate::world::layer::generated::PackTuning::instant_work
     /// [`UnpackTuning::instant_work`]: crate::world::layer::generated::UnpackTuning::instant_work
-    pub(crate) fn building_work(&self, master: &Master, step: &Step<'_>, instant: f32) -> Seconds {
+    pub(crate) fn building_work(
+        &self,
+        master: &Master,
+        step: &Step<'_>,
+        instant: Seconds,
+    ) -> Seconds {
         if step.world.instant_work != 0 {
-            return Seconds::new(instant);
+            return instant;
         }
         Seconds::new(
             (step.world.parts.combat_of(self.id).work_rate_powerup

@@ -41,7 +41,9 @@ use strum::FromRepr;
 pub(crate) const PACK_NOT_BUILDING: GenieError =
     GenieError::unreachable("a Pack or Unpack of a master without its building part");
 
-/// The progress of a Pack in state 1 (`FUN_140ad6170`'s `MOV EAX, 0x64`): all of it.
+/// The progress of a Pack in state 1 (`FUN_140ad6170`'s `MOV EAX, 0x64`): all of it. The
+/// Unpack's progress has an immediate of its own with the same value (`construction::unpack`'s
+/// `DONE`).
 const DONE: PackProgress = PackProgress(100);
 /// The whole of a Pack's progress, its percent (`DAT_14330ebcc`, `FUN_140ad6170`).
 const PERCENT: f32 = PACK_PERCENT;
