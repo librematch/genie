@@ -1,14 +1,18 @@
-//! `UNIT_ORDER`'s Housing (case 3) and the work that keeps a building from its cases 1 to 3.
+//! The Housing's installs, `UNIT_ORDER`'s (case 3) and the work command's (the factory's case
+//! 0x7b), and the work that keeps a building from `UNIT_ORDER`'s cases 1 to 3.
 
 use crate::commands::QueueId;
+use crate::map::Position;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterKind;
 use crate::orders::unit_order::ORDER_ASLEEP;
+use crate::orders::work::WORK_WITHOUT_UNIT_AI;
 use crate::players::PlayerId;
 use crate::production::Making;
+use crate::unit_ai::Notifies;
 use crate::world::Unread;
 use crate::world::World;
 use crate::world::index::Place;
@@ -82,6 +86,40 @@ impl World {
                 return Err(HOUSING_WITHOUT_BUILDING.with("object", unit.id));
             }
             self.install_housing(player_id, idx, queue_id)?;
+        }
+        Ok(())
+    }
+
+    /// The work command's Housing (`FUN_14106ff70`'s tail for a task of action type 0x7b) of
+    /// object `idx` of player `player` on `target` (none for a point) at `point`. The list's
+    /// factory (`FUN_140aca4b0` case 0x7b) makes it with the queue id −1 (`FUN_140ac1b80` with
+    /// `0xffffffff`, [`QueueId::NONE`]) and reads nothing of the task or the target. The unit AI
+    /// hears of it (slot 0x828 with 0x7b, [`World::notify_new_action`]: `FUN_14106e4e0`'s switch
+    /// names no 0x7b, so no order and no action), then the install (slot 0x808,
+    /// [`World::install_housing`]: the list's deletion, then its add, which starts the Housing
+    /// below state 3 and deletes it unstarted from state 3 on). The work command then clears the
+    /// unit AI's `+0x1d5` (not held: the task unit-ai-1d5-attack-ready) through a pointer it does
+    /// not test, and reads nothing more of the action: only the Attack's type 9 goes on to
+    /// `FUN_140a7a190`.
+    ///
+    /// # Errors
+    ///
+    /// An object the world lacks, the notify's and the install's, and an object without a unit
+    /// AI, where the game writes through a null pointer ([`WORK_WITHOUT_UNIT_AI`]).
+    pub(super) fn start_housing(
+        &mut self,
+        player: PlayerId,
+        idx: ListIndex,
+        target: Option<ObjectId>,
+        point: Position,
+        notifies: Notifies,
+    ) -> GenieResult<()> {
+        let told = self.told_target(target)?;
+        self.notify_new_action(player, idx, ActionKind::HOUSING, told, point, notifies)?;
+        self.install_housing(player, idx, QueueId::NONE)?;
+        let id = self.players.live(player, idx)?.id;
+        if self.parts.unit_ai.get(id).is_none() {
+            return Err(WORK_WITHOUT_UNIT_AI.with("object", id));
         }
         Ok(())
     }

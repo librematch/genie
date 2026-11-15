@@ -81,11 +81,12 @@ use crate::orders::OrderFlags;
 use crate::orders::OrderSource;
 use crate::orders::ReadyOrders;
 use crate::orders::SavedPatrols;
+use crate::orders::attack::DELETED_ATTACK_WITH_UNIT_AI;
 use crate::orders::attack::attack_task_ai;
-use crate::orders::attack::{ATTACK_WITHOUT_UNIT_AI, DELETED_ATTACK_WITH_UNIT_AI};
 use crate::orders::split::JoinTest;
 use crate::orders::split::splits_together;
 use crate::orders::town_bell::BellShelter;
+use crate::orders::work::WORK_WITHOUT_UNIT_AI;
 use crate::ownership::artifact::Artifact;
 use crate::pathing::Pathing;
 use crate::players::Amount;
@@ -801,7 +802,7 @@ fn work_attack_of_dying_action_object_deletes_its_attack_and_stops_at_null_unit_
     );
     assert_eq!(
         started.map_err(|error| error.reason()),
-        Err(ATTACK_WITHOUT_UNIT_AI.reason())
+        Err(WORK_WITHOUT_UNIT_AI.reason())
     );
     assert!(world.parts.actions_of(soldier).list.is_empty());
     assert_eq!(
@@ -1357,7 +1358,7 @@ fn an_attack_task_of_unit_inside_fails_at_its_start_and_of_one_without_unit_ai_s
     );
     assert_eq!(
         attack_started_after(|world, id| world.parts.set_unit_ai(id, None)),
-        Err(ATTACK_WITHOUT_UNIT_AI.reason())
+        Err(WORK_WITHOUT_UNIT_AI.reason())
     );
 }
 
@@ -1483,7 +1484,7 @@ fn work_attack_on_annex_targets_its_main_building_and_tells_its_unit_ai_the_anne
         )
     );
     let (_, _, started) = attack_on_annex(false);
-    assert_eq!(started, Err(ATTACK_WITHOUT_UNIT_AI.reason()));
+    assert_eq!(started, Err(WORK_WITHOUT_UNIT_AI.reason()));
 }
 
 /// [`annexed`]'s main building 60 and annex 61 on the map's lists, each at its place with a
@@ -6367,7 +6368,7 @@ fn an_attack_task_start_ends_where_the_start_does() {
         )
     );
     assert_ne!(near, None);
-    assert_eq!(started(false, 30.0), Err(ATTACK_WITHOUT_UNIT_AI.reason()));
+    assert_eq!(started(false, 30.0), Err(WORK_WITHOUT_UNIT_AI.reason()));
 }
 
 /// The work command's task (`FUN_14106ff70`): none on a point; the forager's Gather task 2 on

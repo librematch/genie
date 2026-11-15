@@ -1,6 +1,8 @@
 # `construction/housing`: the Housing action
 
-`UNIT_ORDER`'s case 3 gives a building a new Housing (`../../orders/housing_order.rs`). Its start
+`UNIT_ORDER`'s case 3 gives a building a new Housing (`../../orders/housing_order.rs`), and so
+does the work command on a task of action type 0x7b, which no master of build 158041's `.dat`
+holds. Its start
 pays 50 wood straight from the owner's attributes; without the wood it fails (state 13). At work
 (state 6) its timer starts at the owner's attribute 62 and runs down by the building's work rate
 in every update, less while the building is damaged. Once the timer ran out, the building holds 5
@@ -20,7 +22,7 @@ destructor gives it back while it is at work.
 <!-- files -->
 | File | What it holds |
 | --- | --- |
-| [`mod.rs`](mod.rs) | A building's Housing: `TRIBE_Action_Housing` (action type 0x7b, vtable `0x142ed7008`), which `UNIT_ORDER`'s case 3 installs on a building (`World::housing_order`). |
+| [`mod.rs`](mod.rs) | A building's Housing: `TRIBE_Action_Housing` (action type 0x7b, vtable `0x142ed7008`), which `UNIT_ORDER`'s case 3 installs on a building (`World::housing_order`), and the work command's factory on a task of its type (`FUN_140aca4b0` case 0x7b). |
 | [`tests.rs`](tests.rs) | Tests: The Housing's tests on a house of player 1, and the fixtures `UNIT_ORDER`'s tests share. |
 | [`unit.rs`](unit.rs) | A Housing bound to its building and the world: its install and start, its update with the building's work rate and headroom, and the cost its destructor gives back. |
 <!-- /files -->

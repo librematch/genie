@@ -1,5 +1,6 @@
 //! A building's Housing: `TRIBE_Action_Housing` (action type 0x7b, vtable `0x142ed7008`), which
-//! `UNIT_ORDER`'s case 3 installs on a building ([`World::housing_order`]). Its start pays its
+//! `UNIT_ORDER`'s case 3 installs on a building ([`World::housing_order`]), and the work command's
+//! factory on a task of its type (`FUN_140aca4b0` case 0x7b). Its start pays its
 //! cost in wood; at work its timer runs down by the building's work rate from its owner's
 //! attribute 62; once it ran out the building holds more headroom (attribute 4) and its owner
 //! gains as much. Its stop, and its destructor while it is at work, give the cost back.

@@ -22,11 +22,13 @@ use crate::world::slots::PlayerSlotsExt;
 use crate::world::step::Step;
 
 impl World {
-    /// `UNIT_ORDER`'s install of a new Housing on building `idx` of player `player`
-    /// (`FUN_14161e370` case 3): the constructor (`FUN_140ac1b80`, with the order's queue id
-    /// `queue_id`), then slot 0x808 ([`World::set_only_action`]), its start after the add
-    /// ([`HousingAction::start`]) and the head it holds. The game calls slot 0x808 with what the
-    /// allocation gave, also a null that only deletes the list; genie's allocation does not fail.
+    /// The install of a new Housing on object `idx` of player `player`, `UNIT_ORDER`'s
+    /// (`FUN_14161e370` case 3, on a building) and the work command's (the factory
+    /// `FUN_140aca4b0` case 0x7b, [`World::start_task`]): the constructor (`FUN_140ac1b80`, with
+    /// the order's queue id `queue_id`, the work command's −1), then slot 0x808
+    /// ([`World::set_only_action`]), its start after the add ([`HousingAction::start`]) and the
+    /// head it holds. The game calls slot 0x808 with what the allocation gave, also a null that
+    /// only deletes the list; genie's allocation does not fail.
     ///
     /// # Errors
     ///

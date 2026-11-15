@@ -47,6 +47,7 @@ use crate::world::slots::PlayerSlotsExt;
 use crate::{GenieError, GenieResult};
 
 mod garrison;
+mod notify;
 mod retarget;
 #[cfg(test)]
 mod tests;
@@ -60,6 +61,13 @@ const TERRAIN_TASK: GenieError =
 /// The action list's factory for a task the slice does not model.
 const UNMODELLED_FACTORY: GenieError =
     GenieError::unsupported("the action factory for a task the slice does not model");
+
+/// Once the factory's action is installed (slot 0x808), the work command clears its unit AI's
+/// `+0x1d5` through `+0x6b0` with no null test (`0x141070afa`: `MOV RCX,[RDI+0x6b0]`, then
+/// `0x141070b01`: `MOV byte ptr [RCX+0x1d5]`): for an object without a unit AI the game faults
+/// there, whatever action the factory made.
+pub(super) const WORK_WITHOUT_UNIT_AI: GenieError =
+    GenieError::unreachable("the work command writes through a null unit AI");
 
 /// What slot 9 (`FUN_140a841d0`, [`Attack::work`]) reads for the work command's kept Attack
 /// ([`World::keep_attack`]).
@@ -440,8 +448,8 @@ impl World {
     }
 
     /// The action list's factory (slot 0x10) for the work's `task` on `target`: the Enter,
-    /// Attack, Hunt, Build, Repair, Gather or Transport starts; a mule cart's task makes no
-    /// action (the move without one, [`World::work_move`]).
+    /// Attack, Hunt, Build, Repair, Gather, Transport or Housing starts; a mule cart's task makes
+    /// no action (the move without one, [`World::work_move`]).
     pub(super) fn start_task(
         &mut self,
         player: PlayerId,
@@ -454,6 +462,7 @@ impl World {
             // the factory makes no action of a mule cart's task: the move without one
             CART_TASK => self.work_move(player, idx, target, point, notifies),
             TRANSPORT => self.start_transport((player, idx), (target, point), task, notifies),
+            ActionKind::HOUSING => self.start_housing(player, idx, target, point, notifies),
             ENTER | ATTACK_TASK | HUNT | ActionKind::BUILD | REPAIR | GATHER => {
                 let target = target.ok_or(TERRAIN_TASK)?;
                 self.start_object_task(player, idx, (target, point), task, notifies)

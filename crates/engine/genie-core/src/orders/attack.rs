@@ -19,6 +19,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::{MasterTables, Task};
 use crate::objects::sprite::new_sprite;
 use crate::objects::teardown::HeadStart;
+use crate::orders::work::WORK_WITHOUT_UNIT_AI;
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::Notifies;
@@ -35,12 +36,6 @@ use crate::{GenieError, GenieResult};
 /// [`Unit::start_listed_attack`]: crate::objects::unit::Unit::start_listed_attack
 const STARTED_ATTACK_UNLISTED: GenieError =
     GenieError::unreachable("the started attack is not on its list");
-
-/// The work command clears its unit AI's `+0x1d5` after the install through `+0x6b0` with no null
-/// test (`0x141070afa`: `MOV RCX,[RDI+0x6b0]`, then `0x141070b01`: `MOV byte ptr [RCX+0x1d5]`):
-/// for an object without a unit AI the game faults there, before `FUN_140a7a190`.
-pub(super) const ATTACK_WITHOUT_UNIT_AI: GenieError =
-    GenieError::unreachable("the work command's attack writes through a null unit AI");
 
 /// The install (slot 0x808) deleted the work command's Attack unstarted (state 3 or later) of a
 /// unit with a unit AI. Only a combat object or a building holds one (`TRIBE_Combat_Object`), and
@@ -104,7 +99,7 @@ impl World {
     ///
     /// A task range of its own, and what the aim, the factory, the notify, the install and the
     /// start cannot read or do not model. A unit without a unit AI, where the game writes through
-    /// a null pointer ([`ATTACK_WITHOUT_UNIT_AI`]), and a unit with one whose Attack the install
+    /// a null pointer ([`WORK_WITHOUT_UNIT_AI`]), and a unit with one whose Attack the install
     /// deleted unstarted, which no caller reaches ([`DELETED_ATTACK_WITH_UNIT_AI`]).
     pub(super) fn start_attack(
         &mut self,
@@ -130,7 +125,7 @@ impl World {
             self.install_attack(player, idx, attack)?;
         }
         if self.parts.unit_ai.get(id).is_none() {
-            return Err(ATTACK_WITHOUT_UNIT_AI.with("object", id));
+            return Err(WORK_WITHOUT_UNIT_AI.with("object", id));
         }
         if installed.is_none() {
             return Err(DELETED_ATTACK_WITH_UNIT_AI.with("object", id));

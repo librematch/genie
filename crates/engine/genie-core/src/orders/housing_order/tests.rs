@@ -1,23 +1,38 @@
-//! `UNIT_ORDER`'s Housing on the house of `construction::housing`'s tests.
+//! `UNIT_ORDER`'s Housing and the work command's on the house of `construction::housing`'s tests.
 
 use super::*;
 use crate::commands::{Shift, UnitList, UnitOrderAction, UnitOrderCommand};
-use crate::construction::housing::HousingState;
 use crate::construction::housing::tests::{
     AT, HOUSE_ID, ORDER, held, holding, house_master, house_with, house_world, housing, wood,
 };
+use crate::construction::housing::{HousingAction, HousingState};
 use crate::garrison::GarrisonScope;
 use crate::map::Point;
+use crate::map::Position;
 use crate::objects::actions::ActionList;
+use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::Master;
+use crate::objects::masters::TargetOwner;
+use crate::objects::masters::Task;
+use crate::objects::unit::Unit;
+use crate::orders::MasterSwap;
+use crate::orders::Work;
+use crate::orders::work::WORK_WITHOUT_UNIT_AI;
 use crate::players::PlayerKind;
 use crate::production::UnitIndex;
 use crate::production::{Entry, MakeObj, MakeTech, MakeTechState, Making, Production, QueueLength};
+use crate::test_ids::master_id;
+use crate::test_ids::object_id;
 use crate::test_ids::object_ids;
 use crate::test_ids::tech_id;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::slots;
+use crate::unit_ai::AiAction;
+use crate::unit_ai::Answer;
+use crate::unit_ai::Notifies;
+use crate::unit_ai::OrderKind;
+use crate::unit_ai::UnitAi;
 use crate::world::Seconds;
 use std::iter::once;
 
@@ -264,4 +279,189 @@ fn unit_order_runs_housing_and_ignores_other_bytes() {
     let mut other = house_with(ActionList::default(), 120.0);
     command(UnitOrderAction::Other(9)).run(&mut other).unwrap();
     assert_eq!((held(&other), wood(&other)), (None, 120.0));
+}
+
+/// The second house of player 1 that the work command names (object 701).
+const NAMED: ObjectId = object_id(701);
+
+/// The work command's point.
+const POINT: Position = Position::new(12.5, 14.5, 0.0);
+
+/// A stand-in master 273 (an id that build 158041's `.dat` leaves empty in every civilisation)
+/// of the house master's kind and class, whose one task is a Housing (type 0x7b) on its own
+/// player's objects of the house master 70: no master of the `.dat` holds a task of that type.
+fn housing_master() -> Master {
+    let mut stand_in = house_master();
+    stand_in.id = master_id(273);
+    stand_in.action.as_mut().unwrap().tasks = vec![Task {
+        action_kind: ActionKind::HOUSING,
+        object_id: Some(ids::HOUSE),
+        owner_kind: TargetOwner::OWN,
+        ..Task::default()
+    }];
+    stand_in
+}
+
+/// The house of the stand-in master [`housing_master`] with the unit AI `ai` (none: without one)
+/// and the action list `list`, holding 5 headroom, its owner 120 wood, beside a second house 701
+/// of player 1 (master 70).
+fn work_world(ai: Option<UnitAi>, list: ActionList) -> World {
+    let mut world = house_world(
+        housing_master(),
+        (Some(slots().attribute.headroom), 5.0),
+        list,
+        120.0,
+    );
+    world.players[1].objects.push(Unit {
+        id: NAMED,
+        life: Lifecycle {
+            state: ObjectState::Alive,
+            master_id: ids::HOUSE,
+            ..Lifecycle::default()
+        },
+        ..Unit::default()
+    });
+    world.reindex();
+    world.parts.set_unit_ai(HOUSE_ID, ai);
+    world
+}
+
+/// The house's unit AI on an attack order and action, with no target.
+fn attacking() -> UnitAi {
+    UnitAi {
+        current_order: Some(OrderKind::Attack),
+        current_action: Some(AiAction::Attack),
+        ..UnitAi::default()
+    }
+}
+
+/// The stand-in master's Housing task.
+fn housing_task() -> Task {
+    housing_master().action_part().tasks[0]
+}
+
+/// The work command's factory (slot 0x10) on the Housing task, naming `target` at the point.
+fn work(world: &mut World, target: Option<ObjectId>) -> GenieResult<()> {
+    world.start_task(
+        AT.0,
+        AT.1,
+        (target, POINT),
+        &housing_task(),
+        Notifies::Cleared,
+    )
+}
+
+/// The work command (`FUN_14106ff70`) on the second house: the general search finds the house
+/// master's Housing task by the target's master (`FUN_1411a8ba0`), nothing on top retakes it, and
+/// the factory's Housing (case 0x7b) is installed and paid, its queue id −1.
+#[test]
+fn work_command_on_house_installs_its_master_housing() {
+    let mut world = work_world(Some(attacking()), ActionList::default());
+    world
+        .work_command(AT.0, AT.1, &Work::on(Some(NAMED), POINT))
+        .unwrap();
+    assert_eq!(
+        (
+            held(&world).map(|housing_action| housing_action.unique_id),
+            wood(&world)
+        ),
+        (Some(QueueId::NONE), 70.0)
+    );
+}
+
+/// The factory's case 0x7b: a new Housing with the queue id −1 (`FUN_140ac1b80` with
+/// `0xffffffff`) pays 50 of the owner's 120 wood at its start and goes to work on attribute 62.
+#[test]
+fn work_command_housing_task_installs_paid_housing_without_queue_id() {
+    let mut world = work_world(Some(attacking()), ActionList::default());
+    work(&mut world, Some(NAMED)).unwrap();
+    assert_eq!(
+        (held(&world), wood(&world)),
+        (
+            Some(HousingAction {
+                state: HousingState::Working,
+                timer: Seconds::new(20.0),
+                unique_id: QueueId::NONE,
+            }),
+            70.0
+        )
+    );
+}
+
+/// The unit AI hears of the new Housing (slot 0x828 with 0x7b, which `FUN_14106e4e0`'s switch
+/// does not name): no order and no action, the old ones its last, and the named house with its
+/// class at the work's point; a work on a point names no target.
+#[test]
+fn work_command_housing_tells_unit_ai_no_order_and_no_action() {
+    let told = |target| {
+        let mut world = work_world(Some(attacking()), ActionList::default());
+        work(&mut world, target).unwrap();
+        let ai = world.parts.unit_ai.get(HOUSE_ID).unwrap().clone();
+        (
+            (ai.current_order, ai.last_order),
+            (ai.current_action, ai.last_action),
+            (ai.current_target, ai.target_class, ai.target_point),
+        )
+    };
+    let was = (Some(OrderKind::Attack), Some(AiAction::Attack));
+    assert_eq!(
+        told(Some(NAMED)),
+        (
+            (None, was.0),
+            (None, was.1),
+            (Some(NAMED), Some(class::BUILDING), POINT)
+        )
+    );
+    assert_eq!(told(None).2, (None, None, POINT));
+}
+
+/// The work command clears its unit AI's `+0x1d5` after the install through a pointer it does
+/// not test: an object without a unit AI faults there, its Housing installed and paid.
+#[test]
+fn work_command_housing_without_unit_ai_faults_after_install() {
+    let mut world = work_world(None, ActionList::default());
+    assert_eq!(
+        work(&mut world, Some(NAMED)).map_err(|error| error.reason()),
+        Err(WORK_WITHOUT_UNIT_AI.reason())
+    );
+    assert_eq!(
+        (working(&world), wood(&world)),
+        (Some((HousingState::Working, 20.0)), 70.0)
+    );
+}
+
+/// From state 3 on the install's add deletes the new Housing unstarted: the list holds none,
+/// and the wood stays.
+#[test]
+fn work_command_housing_of_dying_building_installs_none() {
+    let mut world = work_world(Some(attacking()), ActionList::default());
+    world.players[1].objects[AT.1].life.state = ObjectState::Dying;
+    work(&mut world, Some(NAMED)).unwrap();
+    assert_eq!((held(&world), wood(&world)), (None, 120.0));
+}
+
+/// A Housing on top holds no task (`+0x48`, which its constructor leaves null), so the work's
+/// retake on a Housing task answers 0 (`FUN_140a98710`'s none); the factory's new Housing then
+/// replaces it, the old one's cost given back before the new one pays.
+#[test]
+fn work_command_on_housing_replaces_the_housing_on_top() {
+    let mut world = work_world(
+        Some(attacking()),
+        holding(housing(HousingState::Working, 4.0)),
+    );
+    assert_eq!(
+        world.retake_task(
+            AT.0,
+            AT.1,
+            (Some(NAMED), POINT, Notifies::Cleared),
+            &housing_task(),
+            MasterSwap::Keep
+        ),
+        Ok(Answer::NotTaken)
+    );
+    work(&mut world, Some(NAMED)).unwrap();
+    assert_eq!(
+        (working(&world), wood(&world)),
+        (Some((HousingState::Working, 20.0)), 120.0)
+    );
 }

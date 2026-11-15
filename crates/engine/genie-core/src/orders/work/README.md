@@ -7,6 +7,8 @@ new target with that action.
 - `garrison.rs` holds the unit as the finder's actor and that test.
 - `retarget.rs` holds the action that takes the new target: a Hunt or a Gather retargets, a
   Build or a Repair takes the target again. `retarget/` holds its tests.
+- `notify.rs` holds the work notify (the unit's slot 0x828): the unit AI hears of the new action
+  or of the action that took the new target.
 
 ## Files
 
@@ -14,6 +16,7 @@ new target with that action.
 | File | What it holds |
 | --- | --- |
 | [`garrison.rs`](garrison.rs) | The garrison finder's view of a unit: the task finder's actor and whether its own task list holds a garrison task on a target. |
+| [`notify.rs`](notify.rs) | The work command's notify (the unit's slot 0x828) of the action it gave the unit: the unit AI takes the order and action of the action's type and the target. |
 | [`retarget.rs`](retarget.rs) | A worker's action already on the task the work found takes the new target itself (`retake_task`): a Hunt or a Gather retargets, a Build or a Repair takes the target again. |
 | [`tests.rs`](tests.rs) | Tests: The unit's task search (slot 0x820, `World::find_work_task`). |
 | [`retarget/`](retarget/) | The work command's retake's tests. |

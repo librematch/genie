@@ -2,19 +2,17 @@
 //! in the game's data) makes or retakes it.
 
 use crate::GenieResult;
+use crate::garrison::transport::TRANSPORT;
 use crate::garrison::transport::TransportTarget;
 use crate::garrison::transport::{Changed, MapShore, Ship, TransportAction};
 use crate::map::Position;
-use crate::math::rng::Stream;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::actions::Action;
 use crate::objects::masters::Task;
 use crate::players::PlayerId;
-use crate::unit_ai::AiAction;
 use crate::unit_ai::Answer;
 use crate::unit_ai::Notifies;
-use crate::unit_ai::OrderKind;
 use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
@@ -229,38 +227,18 @@ impl World {
                 .contains(ClassRoles::TRADER))
     }
 
-    /// The unit AI's notify of the work command's Transport (`FUN_14106e4e0` kind 0xc): the
-    /// transport order and action, the target with its class (none for a point or a target the
-    /// world does not hold) and the work's point.
+    /// The unit AI's notify of the work command's Transport (slot 0x828 with 0xc,
+    /// [`World::notify_new_action`]): the transport order and action, the target with its class
+    /// (none for a point or a target the world does not hold, [`World::told_target`]) and the
+    /// work's point.
     fn notify_transport(
         &mut self,
         (player_id, list_index): (PlayerId, ListIndex),
         (target, point): (Option<ObjectId>, Position),
         notifies: Notifies,
     ) -> GenieResult<()> {
-        let named = match target.and_then(|id| Some((id, self.object(id)?))) {
-            Some((target, (tp, unit))) => {
-                Some((target, unit.master(self.master_tables(), tp)?.class))
-            }
-            None => None,
-        };
-        let id = self.players.live(player_id, list_index)?.id;
-        if let Some(ai) = self.parts.unit_ai.get_mut(id) {
-            ai.notify_work(
-                Some(OrderKind::Transport),
-                Some(AiAction::Transport),
-                named,
-                point,
-                notifies,
-                self.streams.get_mut(Stream::Ai),
-            )?;
-            self.remember_order(
-                player_id,
-                list_index,
-                (Some(OrderKind::Transport), Some(AiAction::Transport)),
-            )?;
-        }
-        Ok(())
+        let told = self.told_target(target)?;
+        self.notify_new_action(player_id, list_index, TRANSPORT, told, point, notifies)
     }
 
     /// `work` on the view of the Transport on `task` of player `player_id`'s object at `list_index`

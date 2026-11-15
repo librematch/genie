@@ -1,14 +1,12 @@
 //! A worker's action already on the task the work found takes the new target itself
 //! (`retake_task`): a Hunt or a Gather retargets, a Build or a Repair takes the target again.
 
-use crate::combat::attack::ATTACK;
 use crate::construction::repair::REPAIR;
 use crate::garrison::transport::TRANSPORT;
 use crate::gathering::gather::GATHER;
 use crate::gathering::hunt::HUNT;
 use crate::gathering::hunt::HuntAction;
 use crate::map::Position;
-use crate::math::rng::Stream;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::actions::Action;
@@ -19,7 +17,6 @@ use crate::orders::work::{MasterSwap, TERRAIN_TASK};
 use crate::players::PlayerId;
 use crate::unit_ai::Answer;
 use crate::unit_ai::Notifies;
-use crate::unit_ai::work_orders;
 use crate::world::World;
 use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlotsExt;
@@ -75,14 +72,17 @@ impl World {
             }
             // the top action's slot 0x48 (FUN_140a977a0) on the same task: the base's
             // (FUN_140a7bf40: the MoveTo's, the Enter's, the missile's, the Fly's, the Make's, the
-            // wait for a foundation's) answers 0, and the work goes on to the factory
+            // wait for a foundation's) answers 0, and the work goes on to the factory; a Housing
+            // holds no task (`+0x48`, which its constructor FUN_140ac1b80 leaves null), so
+            // FUN_140a98710 gives none and its slot is never asked
             Some(other) if top == Some(task.action_kind) && top != Some(HUNT) => match other {
                 Action::MoveTo(_)
                 | Action::Enter(_)
                 | Action::Missile(_)
                 | Action::Fly(_)
                 | Action::Make(_)
-                | Action::WaitSolidify(_) => Answer::NotTaken,
+                | Action::WaitSolidify(_)
+                | Action::Housing(_) => Answer::NotTaken,
                 _ => {
                     return Err(GenieError::unsupported(
                         "a work command on the unit's current task",
@@ -175,15 +175,8 @@ impl World {
     /// the unit AI hears the order and action of the action on top now (the head
     /// `FUN_140a986f0`, its type `FUN_140a7be70`) on the target `told` with its class (none:
     /// −1) at `point`. A Gather that built its player's foundation left another action on top.
-    ///
-    /// The game calls the unit's slot 0x828 with the type (`0x1410707ee`). A gatherer is a
-    /// `TRIBE_Combat_Object` (type 70), whose slot 0x828 is `FUN_14121c890`. It handles the
-    /// types `0x7a`, `0x84`, `0x87` and `0x88` itself (order `0x2db`, action `0x277`), and
-    /// `0x95`, the Shepherd (order `0x2dc`, action `0x278`). For these it sets the target twice
-    /// (`FUN_140c64be0`), so the target becomes its own last target too. genie's action list
-    /// holds no action of these types, so that branch cannot run here. Every other type goes to
-    /// `RGE_Combat_Object`'s slot 0x828 (`FUN_14106e4e0`): [`work_orders`], where an Attack also
-    /// sets the last retarget time to the world's.
+    /// The game calls the unit's slot 0x828 with the type (`0x1410707ee`,
+    /// [`World::notify_new_action`]).
     ///
     /// # Errors
     ///
@@ -206,23 +199,7 @@ impl World {
                 "a work command's retake that left no action on top",
             ))?;
         let kind = head.kind();
-        let (order, action) = work_orders(kind);
-        let world_time = self.world_time;
-        if let Some(ai) = self.parts.unit_ai.get_mut(id) {
-            if kind == ATTACK {
-                ai.last_retarget_time = world_time;
-            }
-            ai.notify_work(
-                order,
-                action,
-                told,
-                point,
-                notifies,
-                self.streams.get_mut(Stream::Ai),
-            )?;
-            self.remember_order(player, idx, (order, action))?;
-        }
-        Ok(())
+        self.notify_new_action(player, idx, kind, told, point, notifies)
     }
 }
 
