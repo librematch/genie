@@ -5140,7 +5140,11 @@ fn the_unit_ai_hunt_build_and_target_orders_apply_after_its_run() {
         force: OrderForce::Unforced,
         pace: Pace::Run,
     };
-    assert!(with_effects(&mut world, vec![Effect::Move(walk)]).is_err());
+    let moved = world.run_unit_ai(
+        (PlayerId::new(1), ListIndex::new(0)),
+        |ai, _, side, _, rng| side.move_now(walk, ai, rng).map(drop),
+    );
+    assert!(moved.is_err());
     let mut world = sent_off_world(vec![]);
     let before = world.players[1].objects[ListIndex::new(0)].clone();
     with_effects(&mut world, vec![Effect::RestorePatrol]).unwrap();
@@ -9744,9 +9748,9 @@ fn unit_order_drop_off_takes_any_player_unit() {
     assert_eq!(world.players[1].objects[ListIndex::new(0)], before);
 }
 
-/// The unit AI's move at once (`UnitView::effect_now` with `Effect::Move`, ahead of a stop and an
-/// attack command in the same run) does what the move after the update does (slot 0x340: the
-/// actions go, a `MoveTo` to the point).
+/// The unit AI's move at once (`UnitView::move_now`, ahead of a stop and an attack command in the
+/// same run) does what the move from the world does (slot 0x340: the actions go, a `MoveTo` to
+/// the point), and both answer 1.
 #[test]
 fn the_ai_move_at_once_matches_the_one_after_the_update() {
     let mut later = sent_off_world(vec![]);
@@ -9761,12 +9765,16 @@ fn the_ai_move_at_once_matches_the_one_after_the_update() {
         force: OrderForce::Forced,
         pace: Pace::Run,
     };
-    later
-        .move_aside(PlayerId::new(1), ListIndex::new(0), ai_move)
-        .unwrap();
+    assert_eq!(
+        later.move_aside(PlayerId::new(1), ListIndex::new(0), ai_move),
+        Ok(Answer::Taken)
+    );
     now.run_unit_ai(
         (PlayerId::new(1), ListIndex::new(0)),
-        |ai, _, side, _, rng| side.effect_now(Effect::Move(ai_move), ai, rng),
+        |ai, _, side, _, rng| {
+            assert_eq!(side.move_now(ai_move, ai, rng)?, Answer::Taken);
+            Ok(())
+        },
     )
     .unwrap();
     let (first, second) = (
@@ -19570,21 +19578,13 @@ fn an_unforced_ai_move_leaves_move_to_the_same_point() {
     );
 }
 
-/// `FUN_141216c50`: an unpacked trebuchet (class 54) packs instead (not modelled); a packed one
-/// (class 51) moves as any unit. The base slot 0x40 of an Explore and of a wait for a foundation
-/// takes nothing; an action the slice does not hold stops it.
+/// `FUN_141216c50`: a packed trebuchet (class 51) under no Pack or Unpack moves as any unit
+/// (`FUN_1410866e0`); an unpacked one's Pack is the Pack's tests'. The base slot 0x40 of an
+/// Explore and of a wait for a foundation takes nothing; a unit whose list the load could not
+/// read stops it.
 #[test]
-fn an_ai_move_of_trebuchet_packs_and_the_base_slot_takes_nothing() {
+fn an_ai_move_of_packed_trebuchet_moves_and_the_base_slot_takes_nothing() {
     let (mut unit, mut actions, mut motion) = mover_unit(7);
-    assert!(
-        ai_move_of(
-            (&mut unit, &mut actions, &mut motion),
-            forced(Pace::Run),
-            class::CLASS_54
-        )
-        .is_err()
-    );
-    assert_eq!(actions.list.move_to().copied(), None);
     assert_eq!(
         ai_move_of(
             (&mut unit, &mut actions, &mut motion),
@@ -26314,13 +26314,18 @@ fn the_unit_ai_orders_reach_the_unit_and_the_units_they_name() {
         force: OrderForce::Unforced,
         pace: Pace::Run,
     };
-    assert_eq!(
-        applied(
-            &mut world,
-            vec![Effect::Command(AiCommand::MoveAside(aside))]
-        ),
-        Ok(Some(MOVE_TO))
+    let moved_aside = in_update(
+        &mut world,
+        (PlayerId::new(1), ListIndex::new(0)),
+        50,
+        |unit, actions, step| {
+            let answer = step.lend_at((unit, &mut *actions), |world, player_id, list_index| {
+                world.move_aside(player_id, list_index, aside)
+            })?;
+            Ok((answer, actions.top_action_kind()))
+        },
     );
+    assert_eq!(moved_aside, Ok((Answer::Taken, Some(MOVE_TO))));
 }
 
 /// An Enter's transport moves to the meeting point within the entering unit's update (slot

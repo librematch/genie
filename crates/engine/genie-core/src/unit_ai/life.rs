@@ -22,6 +22,7 @@ use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AlertMode;
+use crate::unit_ai::Answer;
 use crate::unit_ai::Attackers;
 use crate::unit_ai::IdleOutcome;
 use crate::unit_ai::OrderForce;
@@ -549,20 +550,47 @@ impl UnitAi {
         self.set_target(None, None, cell.with_height(0.0));
     }
 
-    /// The AI's move (slot 0x130, `FUN_140c55620`): with `force` or no action value, the unit takes
-    /// it (its slot 0x340, which the caller runs), and the AI holds the move action and the point
-    /// without a target (`FUN_140c64c10` with −1, which leaves the target class). The game
-    /// changes the AI only on slot 0x340's 1: the caller's slot 0x340 is `FUN_1410866e0`, which
-    /// always gives 1, but for classes 51 and 54 (`FUN_141216c50`, their packing), which it
-    /// does not run.
-    pub(super) const fn move_to(&mut self, ai_move: AiMove) -> Option<AiMove> {
+    /// The AI's move (slot 0x130, `FUN_140c55620`): unforced (`ai_move.force`) with an action
+    /// value it takes none (0); else the unit's slot 0x340 on the move ([`UnitAi::move_taken`]).
+    ///
+    /// # Errors
+    ///
+    /// The unit's slot 0x340's.
+    pub(super) fn move_to(
+        &mut self,
+        ai_move: AiMove,
+        side: &mut UnitView<'_, '_>,
+        ai: &mut Well512,
+    ) -> GenieResult<Answer> {
         if matches!(ai_move.force, OrderForce::Unforced) && self.current_action.is_some() {
-            return None;
+            return Ok(Answer::NotTaken);
         }
-        self.set_action(Some(AiAction::Move));
-        // FUN_140c64c10 with -1: the world holds no object -1
-        self.target_at(None, None, ai_move.point);
-        Some(ai_move)
+        self.move_taken(ai_move, side, ai)
+    }
+
+    /// The unit's slot 0x340 on the AI's move ([`UnitView::move_now`]: slot 0x130 at
+    /// `0x140c55683`, slot 0x150 at `0x140c4d5ef`) and its answer: only on 1 the action value
+    /// becomes the move's (`0x262`, the old one the last) and the target the point without an
+    /// object (`FUN_140c64c10` with −1, which leaves the target class); on 0 (a trebuchet that
+    /// packs or stays) the AI stands as the slot left it. The slot runs before these writes, so
+    /// its deletion and the Pack's constructor see the AI as it stood.
+    ///
+    /// # Errors
+    ///
+    /// The unit's slot 0x340's.
+    pub(super) fn move_taken(
+        &mut self,
+        ai_move: AiMove,
+        side: &mut UnitView<'_, '_>,
+        ai: &mut Well512,
+    ) -> GenieResult<Answer> {
+        let answer = side.move_now(ai_move, self, ai)?;
+        if answer == Answer::Taken {
+            self.set_action(Some(AiAction::Move));
+            // FUN_140c64c10 with -1: the world holds no object -1
+            self.target_at(None, None, ai_move.point);
+        }
+        Ok(answer)
     }
 
     /// `FUN_140c41e50`: the unit's last human order time drops to `FUN_140fe0d10`'s 5000, not on

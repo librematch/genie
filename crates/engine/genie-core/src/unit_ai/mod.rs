@@ -295,8 +295,6 @@ pub enum Effect {
     /// (`FUN_140a98620`, each action's teardown) and a unit in state 2 takes its standing sprite
     /// (slot 0x68 with slot 0x798's).
     Stop,
-    /// The AI's move (slot 0x130), which the unit takes (its slot 0x340).
-    Move(AiMove),
     /// `FUN_140c41e50`: the unit's last human order time (`+0x650`) is at most this.
     CapHumanOrder(WorldTime),
     /// The queued order on a target (`0x2db`) the AI took: the unit's slot 0x128 on the target,
@@ -344,9 +342,6 @@ pub enum Effect {
 /// slots, which the unit runs at once on itself lent back to its slot.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum AiCommand {
-    /// Slot 0x148 (`FUN_140c4d0d0`) forced: the unit's slot 0x340 to the point
-    /// ([`crate::world::World::move_aside`]).
-    MoveAside(AiMove),
     /// `BuildObject`'s unit part (the AI's slot 0xf0, `FUN_140c47d80`): the unit's build command
     /// (slot 0x380) on the foundation ([`crate::world::World::build_command`]); the AI's part,
     /// the build action and the foundation as its target, is its own ([`UnitAi::build_object`]).

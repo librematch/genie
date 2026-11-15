@@ -1,7 +1,8 @@
 //! The unit's calls its unit AI makes through its view, each at once where the game's AI calls
-//! the unit's slot: the attack command, the under-attack flag, an [`Effect`], the notify its
-//! owner hears, the order slots' commands (the gather and hunt commands in the AI's frame), the
-//! wait for a foundation and the stop of a soldier in a group. The long answers live in their
+//! the unit's slot: the attack command, the under-attack flag, an [`Effect`], the moves that
+//! answer (slot 0x340), the notify its owner hears, the order slots' commands (the gather and
+//! hunt commands in the AI's frame), the wait for a foundation and the stop of a soldier in a
+//! group. The long answers live in their
 //! systems as `UnitView` methods (FD-041-D09): the attack command in
 //! `combat/attack/unit_ai_side.rs` and the wait for a foundation in
 //! `construction/wait_solidify.rs`.
@@ -10,6 +11,7 @@ use crate::math::rng::{Stream, Well512};
 use crate::objects::ObjectId;
 use crate::objects::layers::Action;
 use crate::objects::unit::{Unit, UnitFlags};
+use crate::unit_ai::AiMove;
 use crate::unit_ai::Answer;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::world_view::UnitView;
@@ -66,6 +68,51 @@ impl UnitView<'_, '_> {
                 .master(step.world.master_tables(), step.player)
                 .map(|master| master.class)?;
             unit.run_effect(actions, effect, Some(class), step, roles)
+        })
+    }
+
+    /// The unit's slot 0x340 (`FUN_141216c50`) on its unit AI's move `ai_move` from the unit's
+    /// step, at once in the AI's frame ([`UnitView::in_ai_frame`], [`Unit::ai_move`]), and its
+    /// answer, which slots 0x130 and 0x150 and the walk back read: 0 where a trebuchet packs or
+    /// stays.
+    ///
+    /// # Errors
+    ///
+    /// A unit of a master the world lacks, and the move's.
+    ///
+    /// [`Unit::ai_move`]: crate::objects::unit::Unit::ai_move
+    pub(crate) fn move_now(
+        &mut self,
+        ai_move: AiMove,
+        ai: &mut UnitAi,
+        rng: &mut Well512,
+    ) -> GenieResult<Answer> {
+        let roles = &self.step.world.model.roles.clone();
+        self.in_ai_frame(ai, rng, |unit, actions, step| {
+            let class = unit.master(step.world.master_tables(), step.player)?.class;
+            unit.ai_move(actions, ai_move, class, step, roles)
+        })
+    }
+
+    /// Slot 0x148's call of the unit's slot 0x340 (`FUN_141216c50`, `0x140c4d112`) on the move
+    /// off a footprint `ai_move`, at once in the AI's frame on the unit lent back to its slot
+    /// ([`World::move_aside`]), and its answer.
+    ///
+    /// # Errors
+    ///
+    /// The move's and the lend's.
+    ///
+    /// [`World::move_aside`]: crate::world::World::move_aside
+    pub(crate) fn move_aside_now(
+        &mut self,
+        ai_move: AiMove,
+        ai: &mut UnitAi,
+        rng: &mut Well512,
+    ) -> GenieResult<Answer> {
+        self.in_ai_frame(ai, rng, |unit, actions, step| {
+            step.lend_at((unit, actions), |world, player_id, list_index| {
+                world.move_aside(player_id, list_index, ai_move)
+            })
         })
     }
 

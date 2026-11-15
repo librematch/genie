@@ -17,8 +17,9 @@
 //!
 //! Its makers are the load and the constructor (`FUN_140ad4ff0`,
 //! [`crate::world::World::construct_pack`]), which a trebuchet's work order installs
-//! ([`crate::world::World::install_pack`]); its slot 0x340 and `UNIT_ORDER`'s case 1 are the tasks
-//! pack-install-move and pack-unit-order.
+//! ([`crate::world::World::install_pack`]), as does the unit's slot 0x340 on an AI's move
+//! ([`crate::world::World::install_pack_to_move`]); `UNIT_ORDER`'s case 1 is the task
+//! pack-unit-order.
 
 mod install;
 mod unit;

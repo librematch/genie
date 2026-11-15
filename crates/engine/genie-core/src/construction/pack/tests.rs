@@ -3,6 +3,7 @@
 use super::*;
 use crate::commands::QueueId;
 use crate::construction::Annexes;
+use crate::construction::unpack::{UnpackAction, UnpackState, UnpackStatus};
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GroundOffset;
@@ -53,11 +54,15 @@ use crate::testing::ids;
 use crate::testing::roles;
 use crate::testing::slots;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::AiMove;
+use crate::unit_ai::Answer;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::NotifyKind;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderPriority;
 use crate::unit_ai::OrderTargetKind;
+use crate::unit_ai::Pace;
 use crate::unit_ai::QueuedOrder;
 use crate::unit_ai::UnitAi;
 use crate::world::FrameSeed;
@@ -67,6 +72,7 @@ use crate::world::Player;
 use crate::world::World;
 use crate::world::WorldTime;
 use crate::world::tests::{delete_head_at, in_update, wait_over};
+use crate::world::unread::UNREAD_ACTION;
 use std::sync::Arc;
 
 /// The trebuchet's id.
@@ -1335,4 +1341,123 @@ fn pack_start_with_0_and_other_states_change_the_state_alone() {
         started.unwrap_err().reason(),
         "a Pack's start or take of its target without the Pack on its list"
     );
+}
+
+/// The unit AI's move to the villager's place, forced and running, that the trebuchet's slot
+/// 0x340 (`FUN_141216c50`) takes.
+const TO_FAR: AiMove = AiMove {
+    point: FAR,
+    range: Distance::ZERO,
+    force: OrderForce::Forced,
+    pace: Pace::Run,
+};
+
+/// A path of slot 0x340: from the world ([`World::move_aside`]) or from the unit's step
+/// ([`Unit::ai_move`], its class from the master the trebuchet holds).
+type SlotPath = fn(&mut World) -> GenieResult<Answer>;
+
+/// Slot 0x340 from the world.
+fn from_world(world: &mut World) -> GenieResult<Answer> {
+    world.move_aside(AT.0, AT.1, TO_FAR)
+}
+
+/// Slot 0x340 from the trebuchet's step.
+fn from_step(world: &mut World) -> GenieResult<Answer> {
+    in_update(world, AT, 0, |unit, actions, step| {
+        let class = unit.master(step.world.master_tables(), step.player)?.class;
+        unit.ai_move(actions, TO_FAR, class, step, &roles())
+    })
+}
+
+/// Both paths of slot 0x340.
+const SLOT_PATHS: [SlotPath; 2] = [from_world, from_step];
+
+/// `FUN_141216c50` on an unpacked trebuchet (class 54) under no Pack or Unpack: a Pack of its
+/// own (`FUN_140ad4ff0` with −1) through slot 0x808, started at work, in place of the move,
+/// and the answer 0 (`0x141216eb0`). Its constructor gives the unit AI the order 0x2db (the
+/// attack order the last) and the action 0x277; the building shows its construction sprite, a
+/// new instance; no `MoveTo` is made. Both the world's and the step's path.
+#[test]
+fn ai_move_of_class_54_installs_its_pack_and_answers_0() {
+    for path in SLOT_PATHS {
+        let mut world = mapped(ActionList::default(), PlayerKind::Human, FAR);
+        world.players[1].objects[AT.1].sprite =
+            Some(ActiveSprite::at_rest(graphic(STANDING), Frame::of_data(4)));
+        world.parts.actions_mut(TREBUCHET).unwrap().pack_progress = PackProgress::of_data(40);
+        attacking_ai(&mut world, None);
+        assert_eq!(path(&mut world), Ok(Answer::NotTaken));
+        assert_eq!(
+            world.parts.actions_of(TREBUCHET).list,
+            packing(installed(None))
+        );
+        assert_eq!(
+            ai_orders(&world),
+            (
+                Some(OrderKind::OnTarget),
+                Some(OrderKind::Attack),
+                Some(AiAction::OnTarget)
+            )
+        );
+        assert_eq!(shown(&world), Some((PACKING, 0)));
+    }
+}
+
+/// An Unpack on its way to the villager, as its constructor makes it.
+fn unpacking() -> UnpackAction {
+    UnpackAction {
+        state: UnpackState::New,
+        target: Some(TARGET),
+        point: Point::new(20.0, 30.0),
+        timer: Seconds::ZERO,
+        unique_id: QueueId::NONE,
+        status: UnpackStatus::Idle,
+        range: Distance::ZERO,
+    }
+}
+
+/// `FUN_141216c50` on a trebuchet of class 54 or 51 whose head packs or unpacks (types `0x7c`,
+/// `0x7d`): nothing, and the answer 0. The list, the sprite and the unit AI stay as they were,
+/// on both paths.
+#[test]
+fn ai_move_of_trebuchet_under_its_pack_or_unpack_stays_and_answers_0() {
+    let heads = [
+        packing(working(12.0)),
+        ActionList::default().with_unpack(Some(unpacking())),
+    ];
+    for path in SLOT_PATHS {
+        for master in [ids::ID_42, ids::ID_331] {
+            for list in heads.clone() {
+                let mut world = mapped(list.clone(), PlayerKind::Human, FAR);
+                world.players[1].objects[AT.1].life.master_id = master;
+                attacking_ai(&mut world, None);
+                assert_eq!(path(&mut world), Ok(Answer::NotTaken), "{master:?}");
+                assert_eq!(world.parts.actions_of(TREBUCHET).list, list, "{master:?}");
+                assert_eq!(
+                    ai_orders(&world),
+                    (Some(OrderKind::Attack), None, Some(AiAction::Attack))
+                );
+                assert_eq!(shown(&world), Some((PACKING, 9)));
+            }
+        }
+    }
+}
+
+/// `FUN_141216c50` on a trebuchet whose list the load could not read: its head may be a Pack or
+/// an Unpack, so slot 0x340 answers the load's error and installs nothing, on both paths.
+#[test]
+fn ai_move_of_unread_trebuchet_answers_its_load_error() {
+    for path in SLOT_PATHS {
+        for master in [ids::ID_42, ids::ID_331] {
+            let mut world = mapped(ActionList::default(), PlayerKind::Human, FAR);
+            world.players[1].objects[AT.1].life.master_id = master;
+            world.set_unread(TREBUCHET, GenieError::unsupported("a test's action"));
+            attacking_ai(&mut world, None);
+            assert_eq!(path(&mut world), Err(UNREAD_ACTION), "{master:?}");
+            assert!(world.parts.actions_of(TREBUCHET).list.is_empty());
+            assert_eq!(
+                ai_orders(&world),
+                (Some(OrderKind::Attack), None, Some(AiAction::Attack))
+            );
+        }
+    }
 }

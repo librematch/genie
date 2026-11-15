@@ -100,6 +100,24 @@ impl World {
         Ok(())
     }
 
+    /// Slot 0x340's Pack of an unpacked trebuchet (`FUN_141216c50`,
+    /// [`MoveWith::Packs`]) on player `player`'s unit at `idx`: the constructor with the queue id
+    /// −1 (`MOV R8D, -1` at `0x141216e87`), slot 0x808 (`0x141216eaa`) and the start, with no
+    /// target ([`World::install_pack`]).
+    ///
+    /// [`MoveWith::Packs`]: crate::movement::ai_moves::MoveWith::Packs
+    ///
+    /// # Errors
+    ///
+    /// The install's.
+    pub(crate) fn install_pack_to_move(
+        &mut self,
+        player: PlayerId,
+        idx: ListIndex,
+    ) -> GenieResult<()> {
+        self.install_pack(player, idx, QueueId::NONE, None)
+    }
+
     /// The Pack's slot 0x68 (`RGE_Action`'s `FUN_140a7a230`) with `target` once slot 0x808
     /// added it (`0x14122736c`) on player `player`'s unit at `idx`: its target becomes `target`
     /// ([`World::retarget_action`]: none past state 6, else taken by slot 0x178, as the Pack is

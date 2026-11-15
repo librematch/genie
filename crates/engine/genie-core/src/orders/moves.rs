@@ -272,25 +272,31 @@ impl World {
             .and_then(|id| self.model.graphics.get(id).copied()))
     }
 
-    /// The unit's slot 0x340 from its unit AI's move off a footprint (slot 0x148,
-    /// [`crate::objects::unit::Unit::ai_move_with`]): the `MoveTo` made for a list whose head
-    /// declines the point replaces the list through the install ([`World::install_move_to`]: a
-    /// deleted head's restart at once); a Transport sails
-    /// ([`World::transport_move`]); then what the head let go: a counted repairer leaves its
-    /// building ([`World::leave_builders`]), the targets go ([`World::release`]).
+    /// The unit's slot 0x340 from the world (its unit AI's move off a footprint, slot 0x148, and
+    /// the world's own callers; [`crate::objects::unit::Unit::ai_move_with`]) and its answer
+    /// ([`MoveWith::answer`]): the `MoveTo` made for a list whose head declines the point
+    /// replaces the list through the install ([`World::install_move_to`]: a deleted head's
+    /// restart at once); a Transport sails ([`World::transport_move`]); an unpacked trebuchet
+    /// installs its Pack ([`World::install_pack_to_move`]); then what the head let go: a counted
+    /// repairer leaves its building ([`World::leave_builders`]), the targets go
+    /// ([`World::release`]).
+    ///
+    /// # Errors
+    ///
+    /// The unit's slot 0x340's, the install's, the sail's and the releases'.
     pub(crate) fn move_aside(
         &mut self,
         player: PlayerId,
         idx: ListIndex,
         ai_move: AiMove,
-    ) -> GenieResult<()> {
+    ) -> GenieResult<Answer> {
         let unit = &self.players.live(player, idx)?;
         let class = unit.master(self.master_tables(), player)?.class;
         let by = self.releaser(player, idx)?;
         let id = self.players.live(player, idx)?.id;
         let top_speed = self.top_speed_terms(player, unit)?;
         let (mut releases, mut builder_leaves) = (Vec::new(), Vec::new());
-        let sails = self.players.live(player, idx)?.ai_move_with(
+        let move_with = self.players.live(player, idx)?.ai_move_with(
             (self.parts.actions.of_mut(id)?, self.parts.unread.get(id)),
             self.parts.motion.layer_mut(id),
             ai_move,
@@ -305,12 +311,13 @@ impl World {
                 top_speed,
             },
         )?;
-        match sails {
+        match move_with {
             MoveWith::Sails(transport_action) => {
                 self.transport_move((player, idx), transport_action, ai_move.point)?;
             }
             MoveWith::Replaces(move_to) => self.install_move_to(player, idx, move_to)?,
-            MoveWith::Walks => {}
+            MoveWith::Packs => self.install_pack_to_move(player, idx)?,
+            MoveWith::Walks | MoveWith::Stays => {}
         }
         for id in builder_leaves {
             self.leave_builders(Some(id))?;
@@ -318,7 +325,7 @@ impl World {
         for (id, by) in releases {
             self.release(id, by)?;
         }
-        Ok(())
+        Ok(move_with.answer())
     }
 
     /// Slot 0x7e8 of a unit on a target object: an action object's (types 40 to 60) is the work

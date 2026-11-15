@@ -460,15 +460,15 @@ impl UnitAi {
             }
             return Ok(OrderOutcome::NotTaken);
         }
-        let Some(ai_move) = self.move_to(AiMove {
+        let gone_move = AiMove {
             point: queued_order.point,
             range: queued_order.range,
             force: OrderForce::Forced,
             pace: Pace::Walk,
-        }) else {
-            return Ok(OrderOutcome::NotTaken);
         };
-        side.effect_now(Effect::Move(ai_move), self, ai)?;
+        if self.move_to(gone_move, side, ai)? == Answer::NotTaken {
+            return Ok(OrderOutcome::NotTaken);
+        }
         Ok(self.order_tail(
             Some(queued_order.order),
             queued_order.priority,

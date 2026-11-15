@@ -13,7 +13,6 @@ use crate::objects::masters::MasterKind;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
-use crate::unit_ai::AiCommand;
 use crate::unit_ai::Answer;
 use crate::unit_ai::AttackChecks;
 use crate::unit_ai::GroupState;
@@ -29,9 +28,8 @@ use crate::unit_ai::TargetRules;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::{
-    AiMove, AttackAsk, BREAK, DEAD, Effect, GO_ON, Named, Notify, OrderTargetKind, Pick,
-    QueuedOrder, STILL, Search, Surroundings, UnitAi, UnitSeen, alert_owner,
-    closest_undiscovered_tile,
+    AiMove, AttackAsk, BREAK, DEAD, GO_ON, Named, Notify, OrderTargetKind, Pick, QueuedOrder,
+    STILL, Search, Surroundings, UnitAi, UnitSeen, alert_owner, closest_undiscovered_tile,
 };
 use crate::world::Millis;
 use crate::world::layer::ClassRoles;
@@ -445,11 +443,15 @@ impl UnitAi {
 
     /// Slot 0x148 (`FUN_140c4d0d0`), the move off a footprint: with its force flag
     /// (`ai_move.force`) or without an action value, the unit's slot 0x340 takes the move with the
-    /// same arguments ([`AiCommand::MoveAside`], which the caller runs after the update); on its 1
-    /// the action value becomes [`AiAction::MoveAside`], the old one the last, and the target
-    /// stays. The caller's slot 0x340 is `FUN_1410866e0`, which always gives 1, but for classes 51
-    /// and 54 (`FUN_141216c50`, their packing), which it does not run. The move gives the unit its
-    /// `MoveTo` at once: the update's later checks see it busy. Taken when it moves.
+    /// same arguments, at once ([`UnitView::move_aside_now`]); only on its 1 the action value
+    /// becomes [`AiAction::MoveAside`], the old one the last, and the target stays. On its 0 (a
+    /// trebuchet that packs or stays, `FUN_141216c50`) the AI stands as the slot left it. The move
+    /// gives the unit its `MoveTo` at once: the update's later checks see it busy. Slot 0x340's
+    /// answer is the slot's.
+    ///
+    /// # Errors
+    ///
+    /// The unit's slot 0x340's.
     pub(super) fn move_aside(
         &mut self,
         ai_move: AiMove,
@@ -459,9 +461,11 @@ impl UnitAi {
         if ai_move.force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(Answer::NotTaken);
         }
-        side.effect_now(Effect::Command(AiCommand::MoveAside(ai_move)), self, rng)?;
-        self.set_action(Some(AiAction::MoveAside));
-        Ok(Answer::Taken)
+        let answer = side.move_aside_now(ai_move, self, rng)?;
+        if answer == Answer::Taken {
+            self.set_action(Some(AiAction::MoveAside));
+        }
+        Ok(answer)
     }
 
     /// The action values of an explorer (the base handler's case 0x202, a bit test of the action

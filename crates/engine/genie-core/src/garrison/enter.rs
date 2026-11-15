@@ -438,7 +438,9 @@ impl World {
             force: OrderForce::Forced,
             pace: Pace::Run,
         };
-        self.move_aside(player_id, list_index, walk)
+        // the Enter passes over slot 0x340's answer (`JMP` at 0x140a877ba)
+        let _ = self.move_aside(player_id, list_index, walk)?;
+        Ok(())
     }
 
     /// The enter at the Enter's start ([`crate::objects::unit::Unit::enter_building`] into its

@@ -194,52 +194,54 @@ bitflags! {
         const SPEARMAN = 1 << 88;
         /// The classes whose units speed up a siege unit they are inside (6, 45, 46, 50 and 56): entering one counts them in its `+0xad8` and adds 0.05 to its speed powerup `+0xa2c` (slot 52, `FUN_141212e10`, through slot 0x1b0, `FUN_141209d60`), leaving takes both off (slot 53, `FUN_141213120`), and the powerup reset (`FUN_1412066b0`) makes the speed powerup 0.05 a unit.
         const SPEEDS_SIEGE = 1 << 89;
+        /// The trebuchet's classes (`-0xe76`, `-0xe79` raw: unpacked and packed), whose slot 0x340 does nothing while their head action packs or unpacks (types `0x7c`, `0x7d`).
+        const STILL_WHILE_PACKING = 1 << 90;
         /// Class 8, the random-map scripts' `STONE_MINE_CLASS` (908).
-        const STONE_MINE = 1 << 90;
+        const STONE_MINE = 1 << 91;
         /// The building classes a movement damage hits (`0x141207ae8`, decoded 0x33 and 0x36); it hits any object of another type.
-        const STRUCK_BUILDING = 1 << 91;
+        const STRUCK_BUILDING = 1 << 92;
         /// Class 14, the random-map scripts' `TERRAIN_CLASS` (914).
-        const TERRAIN = 1 << 92;
+        const TERRAIN = 1 << 93;
         /// Towers.
-        const TOWER = 1 << 93;
+        const TOWER = 1 << 94;
         /// The trade cart's and the trade boat's classes (`FUN_141195400`, `FUN_141195490`).
-        const TRADER = 1 << 94;
+        const TRADER = 1 << 95;
         /// The trade boat (`-0xeaa` raw): its cared classes and its trade partner are not the cart's.
-        const TRADE_BOAT = 1 << 95;
+        const TRADE_BOAT = 1 << 96;
         /// The trade cart (decoded `0x13`).
-        const TRADE_CART = 1 << 96;
+        const TRADE_CART = 1 << 97;
         /// The class whose busy units skip the idle check (`-0xe98` raw).
-        const TRANSPORT = 1 << 97;
+        const TRANSPORT = 1 << 98;
         /// Class 62, which the best target's category puts with the transports (attack category 10).
-        const TRANSPORT_CATEGORY = 1 << 98;
+        const TRANSPORT_CATEGORY = 1 << 99;
         /// What a trebuchet (class 51 or 54) attacks by its own choice: the rams' but siege and scorpions.
-        const TREBUCHET_TARGET = 1 << 99;
+        const TREBUCHET_TARGET = 1 << 100;
         /// Trees.
-        const TREE = 1 << 100;
+        const TREE = 1 << 101;
         /// Class 16, the random-map scripts' `TREE_STUMP_CLASS` (916).
-        const TREE_STUMP = 1 << 101;
+        const TREE_STUMP = 1 << 102;
         /// Class 45, the random-map scripts' `TWO_HANDED_SWORDSMAN_CLASS` (945).
-        const TWO_HANDED_SWORDSMAN = 1 << 102;
+        const TWO_HANDED_SWORDSMAN = 1 << 103;
         /// The classes no delete takes (`DAT_142f925c0`, and `FUN_14120f620`'s own test): livestock, class 42, artifacts and class 60.
-        const UNDELETABLE = 1 << 103;
+        const UNDELETABLE = 1 << 104;
         /// Unpacked siege units (`.dat` class 54, `-0xe76` raw: the trebuchet, the bombard cannon): they block a placement though desolid, and their ghosts stay watched.
-        const UNPACKED_TREBUCHET = 1 << 104;
+        const UNPACKED_TREBUCHET = 1 << 105;
         /// The classes a building's watch leaves out (`FUN_1411cc980`).
-        const UNWATCHED = 1 << 105;
+        const UNWATCHED = 1 << 106;
         /// Villagers (`-0xea8` raw).
-        const VILLAGER = 1 << 106;
+        const VILLAGER = 1 << 107;
         /// Walls (decoded 27, `0x1b`).
-        const WALL = 1 << 107;
+        const WALL = 1 << 108;
         /// The villagers' class (`FUN_141195750`: the master's class is 4), tested by the wall's train locations.
-        const WALL_BUILDER = 1 << 108;
+        const WALL_BUILDER = 1 << 109;
         /// The warships (`-0xe96` raw), whose attackers make a computer's unit warn its group.
-        const WARSHIP = 1 << 109;
+        const WARSHIP = 1 << 110;
         /// Class 24 (`-0xe94` raw), listed as `CAVALRY` is.
-        const WAR_ELEPHANT = 1 << 110;
+        const WAR_ELEPHANT = 1 << 111;
         /// The class whose garrison share is 1 whatever its firepower (`FUN_141213520`, `-0xe82` raw); UNLOAD's flag 0 leaves it inside (`FUN_14118a610`).
-        const WHOLE_GARRISON_SHARE = 1 << 111;
+        const WHOLE_GARRISON_SHARE = 1 << 112;
         /// The target class whose reach test (the path end's) plans with the wide range added to the range, as master 45 does.
-        const WIDE_REACH = 1 << 112;
+        const WIDE_REACH = 1 << 113;
     }
 }
 

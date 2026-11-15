@@ -291,16 +291,19 @@ impl World {
             return Ok(WorkReturn::Stayed);
         }
         match work_on {
-            None => self.move_aside(
-                up,
-                ui,
-                AiMove {
-                    point: Position::new(x, y, 0.0),
-                    range: Distance::ZERO,
-                    force: OrderForce::Forced,
-                    pace: Pace::Run,
-                },
-            )?,
+            // slot 0x340's answer is passed over (0x1412082ea, then `+0xa14`)
+            None => {
+                let _ = self.move_aside(
+                    up,
+                    ui,
+                    AiMove {
+                        point: Position::new(x, y, 0.0),
+                        range: Distance::ZERO,
+                        force: OrderForce::Forced,
+                        pace: Pace::Run,
+                    },
+                )?;
+            }
             Some(target) => {
                 self.order_work(up, ui, &Work::on(Some(target), Position::new(x, y, 0.0)))?;
             }

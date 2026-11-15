@@ -428,7 +428,8 @@ impl World {
                 },
                 pace: Pace::Walk,
             };
-            self.move_aside(player_id, idx, walk)?;
+            // slot 0x340's answer is passed over (0x14161c27c): the unit AI's order follows
+            let _ = self.move_aside(player_id, idx, walk)?;
         }
         let unit = match self.place(id) {
             Some(Place::Live(owner, slot)) => self.players.live_mut(owner, slot)?,

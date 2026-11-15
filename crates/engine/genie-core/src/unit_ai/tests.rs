@@ -5,10 +5,11 @@ use crate::combat::Firepower;
 use crate::combat::attack::ATTACK;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::tests::own_attack;
+use crate::commands::QueueId;
 use crate::construction::FoundationId;
 use crate::construction::MainBuildingId;
 use crate::construction::RepairTargetId;
-use crate::construction::pack::PackState;
+use crate::construction::pack::{PackAction, PackState, PackStatus};
 use crate::construction::repair::REPAIR;
 use crate::construction::wait_solidify::{WAIT_SOLIDIFY, WaitSolidify};
 use crate::garrison::ContainerId;
@@ -9331,8 +9332,8 @@ fn an_evasive_move_steps_off_point_the_unit_cannot_stand_at() {
 
 /// Slot 0x148 (`FUN_140c4d0d0`): unforced, a unit AI with an action value takes no move off
 /// a footprint; forced, or without one, the unit's slot 0x340 gets the move
-/// (`AiCommand::MoveAside`: its `MoveTo` to the point) and the action value becomes 0x2bf,
-/// the old one the last.
+/// (`UnitView::move_aside_now`: its `MoveTo` to the point) and on its 1 the action value
+/// becomes 0x2bf, the old one the last.
 #[test]
 fn move_off_footprint_needs_force_or_no_action() {
     let aside = |force| AiMove {
@@ -9380,9 +9381,10 @@ fn move_off_footprint_needs_force_or_no_action() {
     assert_eq!((answer, walk), (Ok(Answer::Taken), to_point));
 }
 
-/// Slot 0x130 (`FUN_140c55620`): unforced, a unit AI with an action value takes no move;
-/// forced, the action value becomes the move's (the old one the last) and `FUN_140c64c10`
-/// with −1 moves the target to the last and takes the point, leaving the target class.
+/// Slot 0x130 (`FUN_140c55620`): unforced, a unit AI with an action value takes no move and
+/// the unit no `MoveTo`; forced, the unit's slot 0x340 gives it its `MoveTo` and answers 1, and
+/// then the action value becomes the move's (the old one the last) and `FUN_140c64c10` with −1
+/// moves the target to the last and takes the point, leaving the target class.
 #[test]
 fn an_ai_move_needs_force_or_no_action_and_keeps_the_target_class() {
     let ai_move = |force| AiMove {
@@ -9391,7 +9393,7 @@ fn an_ai_move_needs_force_or_no_action_and_keeps_the_target_class() {
         force,
         pace: Pace::Walk,
     };
-    let mut unit_ai = UnitAi {
+    let unit_ai = UnitAi {
         current_action: Some(AiAction::Attack),
         current_target: Some(object_id(40)),
         target_class: class_of(9),
@@ -9399,12 +9401,37 @@ fn an_ai_move_needs_force_or_no_action_and_keeps_the_target_class() {
         last_target_class: class_of(4),
         ..idle(UnitAiKind::Boar)
     };
-    let before = unit_ai.clone();
-    assert_eq!(unit_ai.move_to(ai_move(OrderForce::Unforced)), None);
-    assert_eq!(unit_ai, before);
+    let move_to = |force| {
+        let mut world = lone_unit_world(unit_ai.clone());
+        let answer = run_ai(
+            &mut world,
+            (player_id(1), object_id(50)),
+            |ai, _, side, _, rng| ai.move_to(ai_move(force), side, rng),
+        );
+        let after = world.parts.unit_ai.get(object_id(50)).unwrap().clone();
+        (answer, after, lone_walks(&world))
+    };
+    let (answer, unmoved, walk) = move_to(OrderForce::Unforced);
+    assert_eq!((answer, walk), (Ok(Answer::NotTaken), None));
     assert_eq!(
-        unit_ai.move_to(ai_move(OrderForce::Forced)),
-        Some(ai_move(OrderForce::Forced))
+        (
+            unmoved.current_action,
+            unmoved.current_target,
+            unmoved.last_target
+        ),
+        (
+            Some(AiAction::Attack),
+            Some(object_id(40)),
+            Some(object_id(30))
+        )
+    );
+    let (answer, unit_ai, walk) = move_to(OrderForce::Forced);
+    assert_eq!(
+        (answer, walk),
+        (
+            Ok(Answer::Taken),
+            Some((Position::new(4.0, 5.0, 0.5), Distance::new(0.5)))
+        )
     );
     assert_eq!(
         (unit_ai.last_action, unit_ai.current_action),
@@ -12334,7 +12361,7 @@ fn the_tail_reads_the_top_target_the_update_commands_left() {
         ..PLAIN
     };
     let player = PlayerId::new(1);
-    let after = |action, follows: Option<i32>, pending: Option<Effect>| {
+    let after = |action, follows: Option<i32>, pending: Option<Effect>, moves: Option<AiMove>| {
         let mut tail_scene = tail_scene(player, action, untargetable, follows)
             .object(target_object(
                 600,
@@ -12349,6 +12376,9 @@ fn the_tail_reads_the_top_target_the_update_commands_left() {
                 if let Some(effect) = pending {
                     side.effect_now(effect, ai, rng)?;
                 }
+                if let Some(ai_move) = moves {
+                    let _ = side.move_now(ai_move, ai, rng)?;
+                }
                 ai.top_target_tail(at, side, rng)
             },
         )
@@ -12356,24 +12386,28 @@ fn the_tail_reads_the_top_target_the_update_commands_left() {
         tail_scene
     };
     // a move to a point, a stop or an explore left no object to test
-    for pending in [
-        Effect::Stop,
-        Effect::Explore {
-            point: Point::new(1.0, 2.0),
-            force: OrderForce::Forced,
-        },
-        Effect::Move(AiMove {
-            point: Position::new(1.0, 2.0, 0.0),
-            range: Distance::ZERO,
-            force: OrderForce::Forced,
-            pace: Pace::Run,
-        }),
+    let to_point = AiMove {
+        point: Position::new(1.0, 2.0, 0.0),
+        range: Distance::ZERO,
+        force: OrderForce::Forced,
+        pace: Pace::Run,
+    };
+    for (pending, moves) in [
+        (Some(Effect::Stop), None),
+        (
+            Some(Effect::Explore {
+                point: Point::new(1.0, 2.0),
+                force: OrderForce::Forced,
+            }),
+            None,
+        ),
+        (None, Some(to_point)),
     ] {
-        let pending_world = after(Some(AiAction::Gather), None, Some(pending));
+        let pending_world = after(Some(AiAction::Gather), None, pending, moves);
         assert_eq!(
             ai_of(&pending_world).current_action,
             Some(AiAction::Gather),
-            "{pending:?}"
+            "{pending:?} {moves:?}"
         );
     }
     // a move to an object holds it: the tail stops the unit on its untargetable target
@@ -12382,7 +12416,7 @@ fn the_tail_reads_the_top_target_the_update_commands_left() {
         state: ObjectState::Alive,
         range: Distance::new(2.0),
     };
-    let game = after(Some(AiAction::Move), None, Some(to));
+    let game = after(Some(AiAction::Move), None, Some(to), None);
     assert!(stopped(&game));
     assert_eq!(
         (ai_of(&game).current_action, ai_of(&game).current_target),
@@ -12390,7 +12424,7 @@ fn the_tail_reads_the_top_target_the_update_commands_left() {
     );
     // no top action, or one on an object the world no longer holds: nothing
     for follows in [None, Some(700)] {
-        let world = after(Some(AiAction::Gather), follows, None);
+        let world = after(Some(AiAction::Gather), follows, None, None);
         assert_eq!(ai_of(&world).current_action, Some(AiAction::Gather));
     }
 }
@@ -14816,4 +14850,283 @@ fn retarget_search_with_building_target_attacks_what_it_finds() {
             "a computer player's bestUnitToAttack"
         ))
     );
+}
+
+/// The unpacked trebuchet master 42 of build 158041's `.dat`: a building of class 54, its
+/// standing sprite the scene's, a building part without annexes and no train location (a pack
+/// time of 0).
+fn trebuchet_master() -> Master {
+    Master {
+        id: ids::ID_42,
+        kind: MasterKind::BUILDING,
+        class: class::CLASS_54,
+        standing_sprite: Some(STANDING.id),
+        building: Some(BuildingMaster::default()),
+        ..Master::default()
+    }
+}
+
+/// A siege unit AI on the attack order, attacking object 40 at (5, 6), its state position at
+/// (10, 10).
+fn attacking_trebuchet_ai() -> UnitAi {
+    UnitAi {
+        current_order: Some(OrderKind::Attack),
+        order_priority: OrderPriority::of_data(100),
+        current_action: Some(AiAction::Attack),
+        current_target: Some(object_id(40)),
+        target_point: Position::new(5.0, 6.0, 0.0),
+        state_position: Point::new(10.0, 10.0),
+        ..idle(UnitAiKind::Siege)
+    }
+}
+
+/// Player 1's trebuchet 50 at (30, 30) under its Pack at work, its unit AI
+/// [`attacking_trebuchet_ai`].
+fn packing_trebuchet_world() -> World {
+    let pack = PackAction {
+        state: PackState::Working,
+        target: None,
+        timer: Seconds::ZERO,
+        status: PackStatus::Packing,
+        unique_id: QueueId::NONE,
+    };
+    lone_world(
+        SceneObject {
+            ai: Some(attacking_trebuchet_ai()),
+            sprite: Some(STANDING.id),
+            actions: Some(Action {
+                list: ActionList::default().with_pack(Some(pack)),
+                ..Action::default()
+            }),
+            ..SceneObject::new(
+                50,
+                player_id(1),
+                trebuchet_master(),
+                Position::new(30.0, 30.0, 0.0),
+            )
+        },
+        &[],
+    )
+}
+
+/// The trebuchet's unit AI's order, action, the action before it, its target and its point.
+fn trebuchet_orders(
+    world: &World,
+) -> (
+    Option<OrderKind>,
+    Option<AiAction>,
+    Option<AiAction>,
+    Option<ObjectId>,
+    Position,
+) {
+    let unit_ai = world.parts.unit_ai.get(object_id(50)).unwrap();
+    (
+        unit_ai.current_order,
+        unit_ai.current_action,
+        unit_ai.last_action,
+        unit_ai.current_target,
+        unit_ai.target_point,
+    )
+}
+
+/// A unit AI's slot that calls the unit's slot 0x340, and its answer.
+type MoveSlot =
+    fn(&mut UnitAi, &Surroundings, &mut UnitView<'_, '_>, &mut Well512) -> GenieResult<Answer>;
+
+/// A forced, running move to (40, 40).
+const TO_40: AiMove = AiMove {
+    point: Position::new(40.0, 40.0, 0.0),
+    range: Distance::ZERO,
+    force: OrderForce::Forced,
+    pace: Pace::Run,
+};
+
+/// The unit's slot 0x340 answers 0 for a trebuchet under its Pack (`FUN_141216c50`): slot 0x130
+/// (`FUN_140c55620`), slot 0x148 (`FUN_140c4d0d0`), slot 0x150 (`FUN_140c4d140`) and the walk
+/// back (`FUN_140c5e7d0`) answer 0 too and leave the unit AI's action and target as they were;
+/// the Pack stays at the head.
+#[test]
+fn moves_trebuchet_under_its_pack_does_not_take_leave_its_unit_ai() {
+    let slots: [(&str, MoveSlot); 4] = [
+        ("slot 0x130", |ai, _, side, rng| {
+            ai.move_to(TO_40, side, rng)
+        }),
+        ("slot 0x148", |ai, _, side, rng| {
+            ai.move_aside(TO_40, side, rng)
+        }),
+        ("slot 0x150", |ai, at, side, rng| {
+            ai.evasive_move(
+                TO_40.point,
+                (OrderForce::Forced, BadPoint::Kept),
+                at,
+                rng,
+                side,
+            )
+        }),
+        ("the walk back", |ai, at, side, rng| {
+            Ok(match ai.walk_back(at, side, rng)? {
+                WalkBack::Walks => Answer::Taken,
+                WalkBack::Stays => Answer::NotTaken,
+            })
+        }),
+    ];
+    for (name, slot) in slots {
+        let mut world = packing_trebuchet_world();
+        let answer = run_ai(
+            &mut world,
+            (player_id(1), object_id(50)),
+            |ai, at, side, _, rng| slot(ai, at, side, rng),
+        );
+        assert_eq!(answer, Ok(Answer::NotTaken), "{name}");
+        assert_eq!(
+            trebuchet_orders(&world),
+            (
+                Some(OrderKind::Attack),
+                Some(AiAction::Attack),
+                None,
+                Some(object_id(40)),
+                Position::new(5.0, 6.0, 0.0)
+            ),
+            "{name}"
+        );
+        assert_eq!(
+            world.parts.actions_of(object_id(50)).top_action_kind(),
+            Some(ActionKind::PACK),
+            "{name}"
+        );
+    }
+}
+
+/// The target block's attack whose target died (`0x140c66b10`) on a trebuchet under its Pack:
+/// processIdle finds nothing, the move back to the target's point answers 0, so the target goes
+/// (`FUN_140c5e1e0`) and the action stops (slot 0xb0 with 1: the stop deletes the Pack). The
+/// order does not end there: a defend order, whose action the attack is not, stays with its
+/// priority, and so does the state position.
+#[test]
+fn kill_move_trebuchet_does_not_take_forgets_its_target_and_stops() {
+    let mut world = packing_trebuchet_world();
+    world
+        .parts
+        .unit_ai
+        .get_mut(object_id(50))
+        .unwrap()
+        .current_order = Some(OrderKind::Defend);
+    let answer = run_ai(
+        &mut world,
+        (player_id(1), object_id(50)),
+        |ai, at, side, kind, rng| ai.next_after_kill(at, kind, rng, side),
+    );
+    assert_eq!(answer, Ok(()));
+    let (order, action, last, target, _) = trebuchet_orders(&world);
+    assert_eq!(
+        (order, action, last, target),
+        (Some(OrderKind::Defend), None, Some(AiAction::Attack), None)
+    );
+    let unit_ai = world.parts.unit_ai.get(object_id(50)).unwrap();
+    assert_eq!(
+        (
+            unit_ai.order_priority.get(),
+            unit_ai.last_order,
+            unit_ai.state_position
+        ),
+        (100, None, Point::new(10.0, 10.0))
+    );
+    assert!(world.parts.actions_of(object_id(50)).list.is_empty());
+}
+
+/// Slot 0x230's move order (`FUN_140c5c170`, case 0x2c5) and its order on a gone target with
+/// no type (the move to the order's point) answer what slot 0x130 answers: 0 for a trebuchet
+/// under its Pack, without the tail; the unit AI's order, action and target stay.
+#[test]
+fn order_moves_trebuchet_does_not_take_are_not_taken() {
+    let order = |kind| QueuedOrder {
+        issuer: Some(Issuer::Player(player_id(1))),
+        order: kind,
+        priority: OrderPriority::of_data(-1),
+        target: Some(object_id(999)),
+        target_owner: None,
+        point: Position::new(40.0, 40.0, 0.0),
+        range: Distance::ZERO,
+        shown: Point::new(40.0, 40.0),
+        ready: true,
+        target_kind: None,
+    };
+    let mut world = packing_trebuchet_world();
+    let moved = run_ai(
+        &mut world,
+        (player_id(1), object_id(50)),
+        |ai, at, side, kind, rng| {
+            ai.process_order(
+                &order(OrderKind::Move),
+                OrderSite::Surroundings(at, kind),
+                rng,
+                side,
+                AiLayer {
+                    roles: &roles(),
+                    slots: &slots(),
+                    unit_ai_tuning: &tuning().unit_ai,
+                },
+            )
+        },
+    );
+    assert_eq!(moved, Ok(OrderOutcome::NotTaken));
+    let mut gone = packing_trebuchet_world();
+    let on_gone = run_ai(
+        &mut gone,
+        (player_id(1), object_id(50)),
+        |ai, at, side, _, rng| {
+            ai.order_on_target(&order(OrderKind::OnTarget), at.class, at, side, rng)
+        },
+    );
+    assert_eq!(on_gone, Ok(OrderOutcome::NotTaken));
+    for world in [&world, &gone] {
+        assert_eq!(
+            trebuchet_orders(world),
+            (
+                Some(OrderKind::Attack),
+                Some(AiAction::Attack),
+                None,
+                Some(object_id(40)),
+                Position::new(5.0, 6.0, 0.0)
+            )
+        );
+    }
+}
+
+/// Slot 0x130 on an unpacked trebuchet under no Pack: the unit's slot 0x340 installs its Pack,
+/// whose constructor gives the unit AI the order 0x2db and the action 0x277 before the slot reads
+/// the answer 0, which leaves them: the action is not the move's, the target stays.
+#[test]
+fn ai_move_of_unpacked_trebuchet_keeps_its_pack_constructor_orders() {
+    let mut world = lone_world(
+        SceneObject {
+            ai: Some(attacking_trebuchet_ai()),
+            sprite: Some(STANDING.id),
+            ..SceneObject::new(
+                50,
+                player_id(1),
+                trebuchet_master(),
+                Position::new(30.0, 30.0, 0.0),
+            )
+        },
+        &[],
+    );
+    let answer = run_ai(
+        &mut world,
+        (player_id(1), object_id(50)),
+        |ai, _, side, _, rng| ai.move_to(TO_40, side, rng),
+    );
+    assert_eq!(answer, Ok(Answer::NotTaken));
+    assert_eq!(
+        trebuchet_orders(&world),
+        (
+            Some(OrderKind::OnTarget),
+            Some(AiAction::OnTarget),
+            Some(AiAction::Attack),
+            Some(object_id(40)),
+            Position::new(5.0, 6.0, 0.0)
+        )
+    );
+    let pack = world.parts.actions_of(object_id(50)).list.pack().copied();
+    assert_eq!(pack.map(|pack| pack.state), Some(PackState::Working));
 }

@@ -187,7 +187,8 @@ impl UnitAi {
     /// the unit could not stand at (its slot 0x278) moves by up to 3 on each axis, five times at
     /// most, each move four draws of the AI stream (the x sign, its amount, the y sign, its
     /// amount), held on the map again. Then the unit's move there (slot 0x340, forced, running,
-    /// range 0): the AI holds the move action and the point without a target. Taken when it moves.
+    /// range 0, [`UnitAi::move_taken`]): on its 1 the AI holds the move action and the point
+    /// without a target (`CMP EAX, 1` at `0x140c4d607`). Slot 0x340's answer is the slot's.
     pub(super) fn evasive_move(
         &mut self,
         point: Position,
@@ -237,18 +238,18 @@ impl UnitAi {
                 y = held(y, at.map.height());
             }
         }
-        let move_to = self.move_to(AiMove {
-            point: Position::new(x, y, point.z()),
-            range: Distance::ZERO,
-            force: OrderForce::Forced,
-            pace: Pace::Run,
-        });
-        if let Some(ai_move) = move_to {
-            side.effect_now(Effect::Move(ai_move), self, ai)?;
-        }
         // the move (slot 0x340) gives the unit its MoveTo at once: the update's later checks see
         // it busy
-        Ok(Answer::Taken)
+        self.move_taken(
+            AiMove {
+                point: Position::new(x, y, point.z()),
+                range: Distance::ZERO,
+                force: OrderForce::Forced,
+                pace: Pace::Run,
+            },
+            side,
+            ai,
+        )
     }
 
     /// The boar's damage notify (`FUN_140c25770`, case 500): at no hit points left

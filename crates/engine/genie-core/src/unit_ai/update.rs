@@ -612,9 +612,16 @@ impl UnitAi {
     /// The target block's attack whose target died (`0x140c66b10`): processIdle (slot 0x240 with
     /// 0, [`UnitAi::process_idle`]) may find what to do next (6); with nothing (5) the AI
     /// moves to its old target's point within the unit's weapon range (slot 0x130, forced,
-    /// running: it always takes it). Then the order ends: it becomes the last order, the order and
+    /// running, [`UnitAi::move_to`]). A move not taken (`TEST EAX, EAX; JNZ` at `0x140c6709b`: a
+    /// trebuchet that packs or stays) forgets the target (`FUN_140c5e1e0`) and stops (slot 0xb0
+    /// with 1, which ends only an order of its action or a patrol), and the routine ends no order
+    /// itself. Else the order ends: it becomes the last order, the order and
     /// its priority −1, a patrol order (711, 733) resetting its timers
     /// ([`UnitAi::leave_patrol_timers`]).
+    ///
+    /// # Errors
+    ///
+    /// processIdle's, the move's and the stop's.
     pub(super) fn next_after_kill(
         &mut self,
         at: &Surroundings,
@@ -624,14 +631,15 @@ impl UnitAi {
     ) -> GenieResult<()> {
         let produced = self.process_idle(at, player_kind, ai, side)?;
         if produced == IdleOutcome::Idle {
-            let move_to = self.move_to(AiMove {
+            let back = AiMove {
                 point: self.target_point,
                 range: at.weapon_range,
                 force: OrderForce::Forced,
                 pace: Pace::Run,
-            });
-            if let Some(ai_move) = move_to {
-                side.effect_now(Effect::Move(ai_move), self, ai)?;
+            };
+            if self.move_to(back, side, ai)? == Answer::NotTaken {
+                self.remove_target();
+                return self.stop_current(StopOrder::Keep, at, side, ai);
             }
         }
         self.leave_patrol_timers(ai);

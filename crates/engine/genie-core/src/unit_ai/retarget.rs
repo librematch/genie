@@ -458,15 +458,14 @@ impl UnitAi {
                     ai,
                 )?;
             } else {
-                let move_to = self.move_to(AiMove {
+                let defend = AiMove {
                     point: self.target_point,
                     range: self.desired_distance,
                     force: OrderForce::Forced,
                     pace: Pace::Run,
-                });
-                if let Some(ai_move) = move_to {
-                    side.effect_now(Effect::Move(ai_move), self, ai)?;
-                }
+                };
+                // processMisc passes over slot 0x130's answer (`LEA EAX, [RDI + 9]` after it)
+                let _ = self.move_to(defend, side, ai)?;
             }
             return Ok(MiscEnd::Ends);
         }

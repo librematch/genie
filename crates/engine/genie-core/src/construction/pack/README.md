@@ -13,7 +13,10 @@ A trebuchet's work order (slot 0x7e8) makes a Pack on a target out of its reach,
 target for a computer's trebuchet. The constructor gives the unit AI the order and the action on
 a target, slot 0x808 puts the Pack alone on the list, and its start sets it to work: its timer
 takes the share done that the building kept, the building shows its construction sprite and its
-annexes that are buildings go. The Pack then takes the order's target.
+annexes that are buildings go. The Pack then takes the order's target. A move that the unit AI
+gives an unpacked trebuchet (slot 0x340) installs a Pack the same way, with no target, unless a
+Pack or an Unpack is at its head already; the slot then answers 0, so the unit AI keeps the
+order and the action that the constructor gave it.
 
 - `mod.rs` holds the action's state, status, timer and queue id, its constructor's part, its
   work, its frame, its stop and its progress.
@@ -22,8 +25,8 @@ annexes that are buildings go. The Pack then takes the order's target.
 - `unit.rs` binds it to the building and the world: the update, the attack order, the transform
   and the destructor's part.
 
-The load and the work order make the Pack here. Its slot 0x340 and `UNIT_ORDER`'s case 1 are
-the tasks pack-install-move and pack-unit-order.
+The load, the work order and the move make the Pack here. `UNIT_ORDER`'s case 1 is the task
+pack-unit-order.
 
 ## In the game
 

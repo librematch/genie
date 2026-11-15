@@ -111,7 +111,8 @@ fn object_move_in_state_3_lets_the_target_of_the_new_move_to_go() {
 }
 
 /// Slot 0x340's move (`FUN_1410866e0`) from the unit's step and from the world (the move off a
-/// footprint): in state 3 the install deletes the new `MoveTo` unstarted, which stops the unit.
+/// footprint): in state 3 the install deletes the new `MoveTo` unstarted, which stops the unit;
+/// either way the move answers 1.
 #[test]
 fn ai_point_move_in_state_3_deletes_the_new_move_to() {
     for (state, held) in [
@@ -119,19 +120,19 @@ fn ai_point_move_in_state_3_deletes_the_new_move_to() {
         (ObjectState::Dying, (false, Speed::ZERO, (1, 1))),
     ] {
         let mut stepped = walker_in(state);
-        stepped
-            .run_on_step(
-                PlayerId::new(1),
-                ListIndex::new(2),
-                |unit, actions, step| {
-                    unit.ai_move(actions, AI_MOVE, class::VILLAGER, step, static_roles())
-                },
-            )
-            .unwrap();
+        let answer = stepped.run_on_step(
+            PlayerId::new(1),
+            ListIndex::new(2),
+            |unit, actions, step| {
+                unit.ai_move(actions, AI_MOVE, class::VILLAGER, step, static_roles())
+            },
+        );
+        assert_eq!(answer, Ok(Answer::Taken));
         let mut aside = walker_in(state);
-        aside
-            .move_aside(PlayerId::new(1), ListIndex::new(2), AI_MOVE)
-            .unwrap();
+        assert_eq!(
+            aside.move_aside(PlayerId::new(1), ListIndex::new(2), AI_MOVE),
+            Ok(Answer::Taken)
+        );
         assert_eq!((kept(&stepped), kept(&aside)), (held, held), "{state:?}");
     }
 }

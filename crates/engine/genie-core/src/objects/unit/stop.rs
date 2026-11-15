@@ -334,20 +334,18 @@ impl Unit {
                 self.last_human_order = self.last_human_order.min(cap);
                 Ok(())
             }
-            Effect::Move(_) | Effect::RestorePatrol => {
+            Effect::RestorePatrol => {
                 let class = class.ok_or(GenieError::unsupported(
                     "an AI move of a master the slice does not have",
                 ))?;
-                let moves = match effect {
-                    Effect::Move(ai_move) => Some(ai_move),
-                    _ => Self::restore_patrol(
-                        step.world.parts.unit_ai.get(self.id),
-                        step.world.parts.motion.mover_mut(self.id),
-                        &step.world.model.tuning.movement,
-                    ),
-                };
+                let moves = Self::restore_patrol(
+                    step.world.parts.unit_ai.get(self.id),
+                    step.world.parts.motion.mover_mut(self.id),
+                    &step.world.model.tuning.movement,
+                );
+                // restorePatrolInformation passes over slot 0x340's answer (`0x140c5e6e7`)
                 moves.map_or(Ok(()), |ai_move| {
-                    self.ai_move(actions, ai_move, class, step, roles)
+                    self.ai_move(actions, ai_move, class, step, roles).map(drop)
                 })
             }
             Effect::OrderOnTarget(order) => step.lend_at(
@@ -366,8 +364,8 @@ impl Unit {
     }
 
     /// The unit's own command its unit AI gives ([`AiCommand`]), at once on the unit lent back
-    /// to its slot ([`Step::lend_at`]): a move off a footprint, a work (slot 0x7e8),
-    /// `BuildObject`'s build command or a drop elsewhere.
+    /// to its slot ([`Step::lend_at`]): a work (slot 0x7e8 or 0x140), `BuildObject`'s build
+    /// command or a drop elsewhere.
     ///
     /// # Errors
     ///
@@ -379,10 +377,6 @@ impl Unit {
         step: &mut Step<'_>,
     ) -> GenieResult<()> {
         match command {
-            AiCommand::MoveAside(ai_move) => step.lend_at(
-                (&mut *self, &mut *actions),
-                |world, player_id, list_index| world.move_aside(player_id, list_index, ai_move),
-            ),
             AiCommand::WorkOn { target, point } => {
                 let work = Work::on(Some(target), point);
                 step.lend_at(

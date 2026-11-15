@@ -329,11 +329,11 @@ impl UnitAi {
     /// `FUN_140c5e7d0`, the walk back to the state position: a unit more than a tile from it
     /// (the squared footprint gap, `FUN_140a847c0`, against [`WALK_BACK`]; `COMISS` then `JNC`,
     /// so a gap that is not a number walks) moves there at its own height within [`WALK_BACK`],
-    /// forced and running (the unit's slot 0x340, which the caller runs: it takes the move but
-    /// for classes 51 and 54, whose slot `FUN_141216c50` the caller does not model). On the
-    /// move the action value becomes the move's (`0x262`, the old one the last); the target
-    /// stays. The move gives the unit its `MoveTo` at once: the update's later checks see it
-    /// busy ([`WalkBack::Walks`]).
+    /// forced and running (the unit's slot 0x340 at once, [`UnitView::move_now`]). Only on its 1
+    /// (`CMP EAX, 1` after `0x140c5e8c0`) the action value becomes the move's (`0x262`, the old
+    /// one the last); the target stays. The move gives the unit its `MoveTo` at once: the
+    /// update's later checks see it busy ([`WalkBack::Walks`]). On its 0 (a trebuchet that packs
+    /// or stays) the AI stands as the slot left it ([`WalkBack::Stays`], the routine's 0).
     pub(super) fn walk_back(
         &mut self,
         at: &Surroundings,
@@ -345,16 +345,15 @@ impl UnitAi {
             return Ok(WalkBack::Stays);
         }
         let (x, y) = (self.state_position.x(), self.state_position.y());
-        side.effect_now(
-            Effect::Move(AiMove {
-                point: Position::new(x, y, at.position.z()),
-                range: Distance::new(WALK_BACK),
-                force: OrderForce::Forced,
-                pace: Pace::Run,
-            }),
-            self,
-            rng,
-        )?;
+        let back = AiMove {
+            point: Position::new(x, y, at.position.z()),
+            range: Distance::new(WALK_BACK),
+            force: OrderForce::Forced,
+            pace: Pace::Run,
+        };
+        if side.move_now(back, self, rng)? == Answer::NotTaken {
+            return Ok(WalkBack::Stays);
+        }
         self.set_action(Some(AiAction::Move));
         Ok(WalkBack::Walks)
     }

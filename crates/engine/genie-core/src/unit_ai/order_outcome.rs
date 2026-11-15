@@ -77,7 +77,7 @@ pub enum MiscEnd {
 pub enum WalkBack {
     /// It walks.
     Walks,
-    /// It is within the leash, or has no way back.
+    /// It is within the leash, or its unit took no move (slot 0x340's 0).
     Stays,
 }
 

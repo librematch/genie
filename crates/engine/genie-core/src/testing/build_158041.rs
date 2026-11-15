@@ -524,6 +524,7 @@ const CLASS_ROLES: [(usize, ClassRoles); 65] = [
             .union(ClassRoles::REPAIRED_AS_UNIT)
             .union(ClassRoles::REPAIR_COSTED)
             .union(ClassRoles::SKIPS_SIEGE_CHECK)
+            .union(ClassRoles::STILL_WHILE_PACKING)
             .union(ClassRoles::STRUCK_BUILDING)
             .union(ClassRoles::TREBUCHET_TARGET)
             .union(ClassRoles::UNWATCHED),
@@ -563,6 +564,7 @@ const CLASS_ROLES: [(usize, ClassRoles); 65] = [
             .union(ClassRoles::RAM_TARGET)
             .union(ClassRoles::REPAIRED_AS_UNIT)
             .union(ClassRoles::REPAIR_COSTED)
+            .union(ClassRoles::STILL_WHILE_PACKING)
             .union(ClassRoles::STRUCK_BUILDING)
             .union(ClassRoles::TREBUCHET_TARGET)
             .union(ClassRoles::UNPACKED_TREBUCHET)

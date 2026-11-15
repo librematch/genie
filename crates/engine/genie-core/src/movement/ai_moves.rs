@@ -1,6 +1,6 @@
-//! A unit's moves its unit AI asks: to a point (slot 0x340, the head action's slot 0x40 may take
-//! the point) and to an object (slot 0x348), a move that gave up, and the standing sprite of a
-//! `MoveTo` that ends at its start.
+//! A unit's moves its unit AI asks: to a point (slot 0x340, its answer, a trebuchet's Pack in
+//! its place, the head action's slot 0x40 may take the point) and to an object (slot 0x348), a
+//! move that gave up, and the standing sprite of a `MoveTo` that ends at its start.
 
 use crate::map::Distance;
 use crate::map::Position;
@@ -10,6 +10,7 @@ use crate::movement::TopSpeed;
 use crate::movement::move_to::Patience;
 use crate::objects::ObjectId;
 use crate::objects::layers::MotionMut;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::PlayersMastersExt;
 use crate::objects::sprite::Cargo;
@@ -53,7 +54,7 @@ use crate::world::layer::generated::SpriteTuning;
 use crate::world::lets::{take, torn_down};
 use crate::world::step::Step;
 use crate::world::unread::UNREAD_ACTION;
-use crate::world::{Unread, WALKER_UNMOVING};
+use crate::world::{Unread, WALKER_UNMOVING, World};
 
 /// What the sprites of a move the unit AI gives read: the owner's masters, the sprites' table,
 /// the unit's terrain look and the build's roles, and what its slot 0x208 reads
@@ -76,13 +77,16 @@ pub(crate) struct MoveSprites<'world> {
 
 impl Unit {
     /// The unit's slot 0x340 on its unit AI's move ([`Unit::ai_move_with`]) in the context
-    /// `step`: what the head lets go applied at once; the `MoveTo` made for a list whose head
-    /// declines the point replaces the list through the install on the step
-    /// ([`Unit::install_own_move_to`]: a deleted head's restart at once); a Transport sails.
+    /// `step`, and its answer ([`MoveWith::answer`]): what the head lets go applied at once; the
+    /// `MoveTo` made for a list whose head declines the point replaces the list through the
+    /// install on the step ([`Unit::install_own_move_to`]: a deleted head's restart at once); a
+    /// Transport sails; an unpacked trebuchet's Pack installs on the unit lent back to its slot
+    /// ([`World::install_pack_to_move`]: its constructor writes the unit AI that the world
+    /// holds).
     ///
     /// # Errors
     ///
-    /// The move's, the deletion's and the sail's.
+    /// The move's, the deletion's, the sail's and the Pack's install.
     pub(crate) fn ai_move(
         &mut self,
         actions: &mut Action,
@@ -90,11 +94,11 @@ impl Unit {
         class: ClassId,
         step: &mut Step<'_>,
         roles: &Roles,
-    ) -> GenieResult<()> {
+    ) -> GenieResult<Answer> {
         let by = self.releaser(step)?;
         let top_speed = step.world.top_speed_terms(step.player, self)?;
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
-        let sails = self.ai_move_with(
+        let move_with = self.ai_move_with(
             (actions, step.world.parts.unread.get(self.id)),
             step.world.parts.motion.layer_mut(self.id),
             requested,
@@ -113,7 +117,7 @@ impl Unit {
             },
         )?;
         torn_down(step, self, (leaves, releases))?;
-        match sails {
+        match move_with {
             MoveWith::Sails(transport_action) => {
                 let sprite_rng = step.world.streams.get_mut(Stream::Sprite);
                 self.transport_sail(
@@ -134,21 +138,22 @@ impl Unit {
                         look: step.world.parts.combat.of(self.id).abilities.look.as_ref(),
                         sprite_rng,
                     },
-                )
+                )?;
             }
-            MoveWith::Replaces(move_to) => self.install_own_move_to(actions, move_to, step),
-            MoveWith::Walks => Ok(()),
+            MoveWith::Replaces(move_to) => self.install_own_move_to(actions, move_to, step)?,
+            MoveWith::Packs => {
+                step.lend_at((&mut *self, &mut *actions), World::install_pack_to_move)?;
+            }
+            MoveWith::Walks | MoveWith::Stays => {}
         }
+        Ok(move_with.answer())
     }
 
     /// The unit's slot 0x340 (`FUN_141216c50`) on a move to `ai_move.point` its unit AI gives it
     /// (also its move off a footprint, [`crate::world::World::move_aside`]), the unit of `class` of
-    /// player `player`. An unpacked trebuchet (class 54) packs instead (its Pack action,
-    /// `FUN_140ad4ff0` through slot 0x808), which is not modelled; a packed one (class 51) whose
-    /// head action packs or unpacks (types `0x7c`, `0x7d`) does nothing, and the slice holds no
-    /// such action, so it moves as any other: `FUN_1410866e0`. Without `ai_move.force` a head
-    /// `MoveTo` whose point (`+0x38`..`+0x40`, [`MoveToAction::point`]) is `ai_move.point` stands:
-    /// the move is done. Then the head action's slot 0x40 may take the point
+    /// player `player`: a trebuchet packs or stays ([`trebuchet_move`]), any other unit moves
+    /// (`FUN_1410866e0`, which answers 1). Without `ai_move.force` a head `MoveTo` whose point
+    /// (`+0x38`..`+0x40`, [`MoveToAction::point`]) is `ai_move.point` stands: the move is done. Then the head action's slot 0x40 may take the point
     /// ([`Unit::head_takes_point`]; the target it lets go into `releases` and a counted repairer's
     /// building into `builder_leaves`, by `by`). Otherwise a `MoveTo` to `ai_move.point` within
     /// `ai_move.range` is made (`FUN_140aa0d30`, the master's walking sprite with [`Pace::Walk`],
@@ -162,7 +167,8 @@ impl Unit {
     ///
     /// # Errors
     ///
-    /// An unpacked trebuchet, and what the head's slot 0x40 does not model.
+    /// A trebuchet whose list the load could not read ([`UNREAD_ACTION`]), and what the head's
+    /// slot 0x40 does not model.
     pub(crate) fn ai_move_with(
         &self,
         (actions, unread): (&mut Action, Option<&Unread>),
@@ -176,14 +182,8 @@ impl Unit {
         ),
         sprites: MoveSprites<'_>,
     ) -> GenieResult<MoveWith> {
-        if sprites
-            .roles
-            .of_class(class)
-            .contains(ClassRoles::PACKS_TO_MOVE)
-        {
-            return Err(GenieError::unsupported(
-                "an AI move of an unpacked trebuchet (class 54: its Pack action, FUN_140ad4ff0)",
-            ));
+        if let Some(siege) = trebuchet_move(actions, unread, class, sprites.roles)? {
+            return Ok(siege);
         }
         if ai_move.force == OrderForce::Unforced
             && actions.top_action_kind() == Some(MOVE_TO)
@@ -582,7 +582,44 @@ fn repair_takes_point(
     Ok(PointMove::Repairs(old, old.filter(|_| counted)))
 }
 
-/// Whether the unit AI's move goes by sea or on foot ([`Unit::ai_move_with`]).
+/// `FUN_141216c50`'s trebuchet part for a unit of `class` whose action layer is `actions` and
+/// whose load could not read its list for `unread`: a class of [`ClassRoles::STILL_WHILE_PACKING`]
+/// (54 at `0x141216d21`, 51 at `0x141216da5`) whose head (`FUN_140a986f0`) packs or unpacks (type
+/// `0x7c` or `0x7d`: `SUB AX, 0x7c; CMP AX, 1; JBE` at `0x141216dc4`) stays
+/// ([`MoveWith::Stays`]); else a class of [`ClassRoles::PACKS_TO_MOVE`] (54 at `0x141216e4c`)
+/// packs ([`MoveWith::Packs`]). None for any other class, and for class 51 under another head:
+/// they move (`FUN_1410866e0` at `0x141216ee6`).
+///
+/// # Errors
+///
+/// A trebuchet whose list the load could not read ([`UNREAD_ACTION`]): its head may be a Pack or
+/// an Unpack.
+fn trebuchet_move(
+    actions: &Action,
+    unread: Option<&Unread>,
+    class: ClassId,
+    roles: &Roles,
+) -> GenieResult<Option<MoveWith>> {
+    let class_roles = roles.of_class(class);
+    if !class_roles.contains(ClassRoles::STILL_WHILE_PACKING) {
+        return Ok(None);
+    }
+    if unread.is_some() {
+        return Err(UNREAD_ACTION);
+    }
+    if matches!(
+        actions.top_action_kind(),
+        Some(ActionKind::PACK | ActionKind::UNPACK)
+    ) {
+        return Ok(Some(MoveWith::Stays));
+    }
+    Ok(class_roles
+        .contains(ClassRoles::PACKS_TO_MOVE)
+        .then_some(MoveWith::Packs))
+}
+
+/// What slot 0x340 does with the unit AI's move: by sea, on foot, a Pack in its place, or
+/// nothing ([`Unit::ai_move_with`]).
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[must_use]
 pub(crate) enum MoveWith {
@@ -595,6 +632,23 @@ pub(crate) enum MoveWith {
     Replaces(MoveToAction),
     /// The unit moves itself, or nothing moves.
     Walks,
+    /// An unpacked trebuchet not under its own Pack or Unpack: the caller installs a Pack in
+    /// place of the move (`FUN_140ad4ff0` with −1, then slot 0x808 at `0x141216eaa`:
+    /// [`crate::world::World::install_pack_to_move`]).
+    Packs,
+    /// A trebuchet under its own Pack or Unpack: nothing moves.
+    Stays,
+}
+
+impl MoveWith {
+    /// Slot 0x340's answer: 0 for a trebuchet that packs or stays (`XOR EAX, EAX` at
+    /// `0x141216eb0`, whatever the install did), else `FUN_1410866e0`'s 1.
+    pub(crate) const fn answer(self) -> Answer {
+        match self {
+            Self::Packs | Self::Stays => Answer::NotTaken,
+            Self::Sails(_) | Self::Replaces(_) | Self::Walks => Answer::Taken,
+        }
+    }
 }
 
 /// What the head action's slot 0x40 did with a move to a point ([`Unit::head_takes_point`]).

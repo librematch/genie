@@ -20,9 +20,9 @@ use crate::unit_ai::flight::BadPoint;
 use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::{
     AI_MOVE_RANGE, AiMove, BOAR_HOME, BOAR_LEASH, BOAR_LEASH_DRAW, BOAR_OFFSET, BOAR_STEP,
-    BOAR_WANDER, Effect, FOUND_WITHOUT_POSITION, Found, HUNTED_CARED, HUNTED_HOME,
-    HUNTED_SIGHT_GROWTH, HUNTED_STEP, LION_CARED, LION_IDLE_TIMEOUT, Memory, Pick, Search,
-    Surroundings, UnitAi, point_gap_squared,
+    BOAR_WANDER, FOUND_WITHOUT_POSITION, Found, HUNTED_CARED, HUNTED_HOME, HUNTED_SIGHT_GROWTH,
+    HUNTED_STEP, LION_CARED, LION_IDLE_TIMEOUT, Memory, Pick, Search, Surroundings, UnitAi,
+    point_gap_squared,
 };
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
@@ -45,10 +45,7 @@ impl UnitAi {
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<IdleOutcome> {
         self.cap_human_order(side, ai)?;
-        let (produced, moved) = self.boar_wander(at, ai);
-        if let Some(ai_move) = moved {
-            side.effect_now(Effect::Move(ai_move), self, ai)?;
-        }
+        let produced = self.boar_wander(at, ai, side)?;
         Ok(if produced {
             IdleOutcome::Acted
         } else {
@@ -56,17 +53,23 @@ impl UnitAi {
         })
     }
 
-    /// [`UnitAi::boar_idle`] past its cap: whether it produced an action, and its move.
+    /// [`UnitAi::boar_idle`] past its cap: whether it produced an action. Its move (slot 0x130,
+    /// [`UnitAi::move_to`]) runs at once, before a heading home boar's flag goes.
+    ///
+    /// # Errors
+    ///
+    /// The move's.
     pub(super) fn boar_wander(
         &mut self,
         at: &Surroundings,
         ai: &mut Well512,
-    ) -> (bool, Option<AiMove>) {
+        side: &mut UnitView<'_, '_>,
+    ) -> GenieResult<bool> {
         let Some(home) = self.home else {
-            return (false, None);
+            return Ok(false);
         };
         if home.furious || at.flags.contains(SurroundingFlags::MODE_1) {
-            return (false, None);
+            return Ok(false);
         }
         let (x, y, z) = (at.position.x(), at.position.y(), at.position.z());
         let dx = x - home.origin.x();
@@ -79,36 +82,39 @@ impl UnitAi {
             force: OrderForce::Forced,
             pace: Pace::Walk,
         };
+        // each move passes over slot 0x130's answer (`MOV EAX, 6` after 0x140c1e7e6, 0x140c1e8b3
+        // and 0x140c1ea7c)
         if home.homeward {
-            let ai_move = self.move_to(go_home);
+            let _ = self.move_to(go_home, side, ai)?;
             if let Some(home) = self.home.as_mut() {
                 home.homeward = false;
             }
-            return (true, ai_move);
+            return Ok(true);
         }
         // comiss; jbe: unordered counts as inside
         if d2.partial_cmp(&leash) != Some(Ordering::Greater) {
             if !ai.rand15().is_multiple_of(BOAR_WANDER) {
-                return (false, None);
+                return Ok(false);
             }
             if d2 > BOAR_HOME {
-                return (true, self.move_to(go_home));
+                let _ = self.move_to(go_home, side, ai)?;
+                return Ok(true);
             }
             let step = |ai: &mut Well512| (ai.rand15() % BOAR_STEP) as i32 - BOAR_OFFSET;
             let nx = step(ai) as f32 + x;
             let ny = step(ai) as f32 + y;
-            return (
-                true,
-                self.move_to(AiMove {
-                    point: Position::new(nx, ny, z),
-                    ..go_home
-                }),
-            );
+            let wander = AiMove {
+                point: Position::new(nx, ny, z),
+                ..go_home
+            };
+            let _ = self.move_to(wander, side, ai)?;
+            return Ok(true);
         }
         if self.target_point.x() == home.origin.x() || self.target_point.y() == home.origin.y() {
-            return (true, None);
+            return Ok(true);
         }
-        (true, self.move_to(go_home))
+        let _ = self.move_to(go_home, side, ai)?;
+        Ok(true)
     }
 
     /// The hunted animal's idle check (slot 72, `FUN_140c1eea0`). `FUN_140c41e50` first
@@ -204,9 +210,8 @@ impl UnitAi {
         if DistanceSquared::ZERO < leash {
             let gap = point_gap_squared(hunted.origin.ground(), at.position, at.size);
             if leash < gap {
-                if let Some(ai_move) = self.move_to(go_home) {
-                    side.effect_now(Effect::Move(ai_move), self, ai)?;
-                }
+                // each move passes over slot 0x130's answer (`MOV EAX, 6` after 0x140c1f20f)
+                let _ = self.move_to(go_home, side, ai)?;
                 return Ok(IdleOutcome::Acted);
             }
         }
@@ -249,9 +254,7 @@ impl UnitAi {
             let dx = x - hunted.origin.x();
             let dy = y - hunted.origin.y();
             if HUNTED_HOME < dy * dy + dx * dx {
-                if let Some(go_home_ai_move) = self.move_to(go_home) {
-                    side.effect_now(Effect::Move(go_home_ai_move), self, ai)?;
-                }
+                let _ = self.move_to(go_home, side, ai)?;
                 return Ok(IdleOutcome::Acted);
             }
             let step = |ai: &mut Well512| {
@@ -264,13 +267,11 @@ impl UnitAi {
             };
             let sx = step(ai) as f32;
             let sy = step(ai) as f32;
-            let wander = self.move_to(AiMove {
+            let wander = AiMove {
                 point: Position::new(x + sx, sy + y, z),
                 ..go_home
-            });
-            if let Some(ai_move) = wander {
-                side.effect_now(Effect::Move(ai_move), self, ai)?;
-            }
+            };
+            let _ = self.move_to(wander, side, ai)?;
             return Ok(IdleOutcome::Acted);
         }
         Ok(IdleOutcome::Idle)
